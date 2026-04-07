@@ -167,12 +167,18 @@ export class EquipmentService {
     let whereClause = {}
 
     switch (user.role) {
-      case 4:
       case 3:
-
         break
 
       case 2:
+        whereClause = {
+          access: {
+            in: [EquipmentAccess.User, EquipmentAccess.Osnova, EquipmentAccess.Ronin]
+          }
+        }
+        break
+
+      case 1:
         whereClause = {
           access: {
             in: [EquipmentAccess.User, EquipmentAccess.Osnova]
@@ -180,14 +186,14 @@ export class EquipmentService {
         }
         break
 
-      case 1:
+      case 0:
         whereClause = {
           access: EquipmentAccess.User
         }
         break
 
       default:
-        throw new Error('Неизвестная роль пользователя')
+        throw new Error(`Неизвестная роль пользователя: ${String(user.role)}`)
     }
 
     const eqModels = await prisma.equipmentModel.findMany({

@@ -116,10 +116,14 @@ export async function authenticatedApi<T = any>(
 
     const request = makeRequest(accessToken);
     inflightAuthenticatedGetRequests.set(requestKey, request);
-
-    request.finally(() => {
-      inflightAuthenticatedGetRequests.delete(requestKey);
-    });
+    request.then(
+      () => {
+        inflightAuthenticatedGetRequests.delete(requestKey);
+      },
+      () => {
+        inflightAuthenticatedGetRequests.delete(requestKey);
+      }
+    );
 
     return request;
   };

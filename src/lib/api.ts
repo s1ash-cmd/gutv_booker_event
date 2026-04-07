@@ -56,10 +56,14 @@ export async function api<T = any>(path: string, options?: RequestInit): Promise
   }
 
   inflightGetRequests.set(key, request);
+  request.then(
+    () => {
+      inflightGetRequests.delete(key);
+    },
+    () => {
+      inflightGetRequests.delete(key);
+    }
+  );
 
-  try {
-    return await request;
-  } finally {
-    inflightGetRequests.delete(key);
-  }
+  return request;
 }

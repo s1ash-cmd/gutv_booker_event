@@ -15,7 +15,7 @@ export async function GET(
     return NextResponse.json(items)
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('не найден')) {
+      if (error.message.includes('не найден') || error.message.includes('Нет экземпляров')) {
         return NextResponse.json({ error: error.message }, { status: 404 })
       }
     }

@@ -275,9 +275,17 @@ export default function EquipmentDetailPage() {
                 Проверка доступности
               </h2>
 
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setShowDatePicker(true)}
-                className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 border border-primary/20 rounded-xl transition-all group"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setShowDatePicker(true);
+                  }
+                }}
+                className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 border border-primary/20 rounded-xl transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -301,7 +309,7 @@ export default function EquipmentDetailPage() {
                     <X className="w-4 h-4" />
                   </Button>
                 )}
-              </button>
+              </div>
 
               {rangeError && (
                 <p className="text-xs text-destructive mt-3 flex items-center gap-2">
