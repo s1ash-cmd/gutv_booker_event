@@ -82,11 +82,10 @@ export default function BookingsPage() {
       let data: BookingResponseDto[] = [];
 
       try {
+        data = await bookingApi.get_my_bookings();
+
         if (selectedStatus !== 'all') {
-          const statusEnum = statusFilterMap[selectedStatus];
-          data = await bookingApi.get_by_status(statusEnum);
-        } else {
-          data = await bookingApi.get_my_bookings();
+          data = data.filter((booking) => booking.status === selectedStatus);
         }
       } catch (apiError: any) {
         if (isNotFoundError(apiError)) {
@@ -115,32 +114,15 @@ export default function BookingsPage() {
     }
 
     const query = searchQuery.trim();
-
-    if (/^\d+$/.test(query)) {
-      try {
-        setLoading(true);
-        const booking = await bookingApi.get_by_id(parseInt(query));
-        setFilteredBookings([booking]);
-      } catch (err: any) {
-        if (isNotFoundError(err)) {
-          setFilteredBookings([]);
-        } else {
-          console.error('Ошибка поиска по ID:', err);
-          setFilteredBookings([]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      const lowerQuery = query.toLowerCase();
-      const filtered = bookings.filter(b =>
-        b.userName.toLowerCase().includes(lowerQuery) ||
-        b.login.toLowerCase().includes(lowerQuery) ||
-        b.reason.toLowerCase().includes(lowerQuery) ||
-        b.equipmentModelIds.some(eq => eq.modelName.toLowerCase().includes(lowerQuery))
-      );
-      setFilteredBookings(filtered);
-    }
+    const lowerQuery = query.toLowerCase();
+    const filtered = bookings.filter(b =>
+      String(b.id) === query ||
+      b.userName.toLowerCase().includes(lowerQuery) ||
+      b.login.toLowerCase().includes(lowerQuery) ||
+      b.reason.toLowerCase().includes(lowerQuery) ||
+      b.equipmentModelIds.some(eq => eq.modelName.toLowerCase().includes(lowerQuery))
+    );
+    setFilteredBookings(filtered);
   }
 
   function clearFilters() {
