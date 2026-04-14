@@ -1,10 +1,14 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,15 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { userApi } from "@/lib/userApi";
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [accountType, setAccountType] = useState<"gutv" | "organization">(
+    "gutv",
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -30,7 +32,7 @@ export function RegisterForm() {
   const currentYear = new Date().getFullYear();
   const years = Array.from(
     { length: currentYear - 2011 + 1 },
-    (_, i) => currentYear - i
+    (_, i) => currentYear - i,
   );
 
   const validateForm = (formData: FormData): Record<string, string> => {
@@ -40,6 +42,7 @@ export function RegisterForm() {
     const lastName = formData.get("lastName") as string;
     const login = formData.get("login") as string;
     const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
     const year = formData.get("year") as string;
 
     if (!firstName || firstName.trim() === "") {
@@ -70,7 +73,13 @@ export function RegisterForm() {
       newErrors.password = "Пароль должен содержать не менее 8 символов";
     }
 
-    if (!year) {
+    if (!confirmPassword || confirmPassword.trim() === "") {
+      newErrors.confirmPassword = "Подтвердите пароль";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Пароли не совпадают";
+    }
+
+    if (accountType === "gutv" && !year) {
       newErrors.year = "Выберите год вступления";
     }
 
@@ -97,21 +106,23 @@ export function RegisterForm() {
       const name = `${firstName.trim()} ${lastName.trim()}`;
       const login = formData.get("login") as string;
       const password = formData.get("password") as string;
-      const joinYear = parseInt(formData.get("year") as string);
-      const ronin = formData.get("ronin") === "on";
+      const isOrganization = accountType === "organization";
+      const joinYear = isOrganization
+        ? null
+        : parseInt(formData.get("year") as string, 10);
 
       await userApi.create_user({
         login,
         password,
         name,
         joinYear,
-        ronin
+        isOrganization,
       });
 
-      router.push('/login');
+      router.push("/login");
     } catch (error) {
       setErrors({
-        form: error instanceof Error ? error.message : 'Ошибка при регистрации'
+        form: error instanceof Error ? error.message : "Ошибка при регистрации",
       });
     } finally {
       setIsLoading(false);
@@ -171,7 +182,9 @@ export function RegisterForm() {
                   disabled={isLoading}
                 />
                 {errors.firstName && (
-                  <p className="text-sm md:text-base lg:text-base text-destructive">{errors.firstName}</p>
+                  <p className="text-sm md:text-base lg:text-base text-destructive">
+                    {errors.firstName}
+                  </p>
                 )}
               </div>
 
@@ -189,7 +202,9 @@ export function RegisterForm() {
                   disabled={isLoading}
                 />
                 {errors.lastName && (
-                  <p className="text-sm md:text-base lg:text-base text-destructive">{errors.lastName}</p>
+                  <p className="text-sm md:text-base lg:text-base text-destructive">
+                    {errors.lastName}
+                  </p>
                 )}
               </div>
             </div>
@@ -208,7 +223,9 @@ export function RegisterForm() {
                 disabled={isLoading}
               />
               {errors.login && (
-                <p className="text-sm md:text-base lg:text-base text-destructive">{errors.login}</p>
+                <p className="text-sm md:text-base lg:text-base text-destructive">
+                  {errors.login}
+                </p>
               )}
             </div>
 
@@ -237,28 +254,91 @@ export function RegisterForm() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-sm md:text-base lg:text-base text-destructive">{errors.password}</p>
+                <p className="text-sm md:text-base lg:text-base text-destructive">
+                  {errors.password}
+                </p>
               )}
             </div>
 
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-14">
-              <div className="flex items-center space-x-2 h-10">
-                <Label
-                  htmlFor="ronin"
-                  className="text-sm md:text-lg lg:text-lg font-medium leading-none cursor-pointer whitespace-nowrap pr-2"
+            <div className="space-y-2">
+              <Label
+                htmlFor="confirmPassword"
+                className="md:text-lg lg:text-lg"
+              >
+                Повторите пароль <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Введите пароль ещё раз"
+                  onChange={() => clearError("confirmPassword")}
+                  className={`pr-10 ${errors.confirmPassword ? "border-destructive" : ""} text-base lg:text-lg`}
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                  disabled={isLoading}
                 >
-                  Есть разрешение на Ronin
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.confirmPassword && (
+                <p className="text-sm md:text-base lg:text-base text-destructive">
+                  {errors.confirmPassword}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="md:text-lg lg:text-lg">
+                  Кто вы? <span className="text-destructive">*</span>
                 </Label>
-                <Checkbox id="ronin" name="ronin" disabled={isLoading} />
+                <Select
+                  value={accountType}
+                  onValueChange={(value) => {
+                    setAccountType(value as "gutv" | "organization");
+                    clearError("year");
+                  }}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="text-base lg:text-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gutv">Член GUtv</SelectItem>
+                    <SelectItem value="organization">
+                      Представитель организации
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Члены GUtv могут бронировать оборудование. Представители
+                  организаций могут создавать только заявки на event.
+                </p>
               </div>
 
-              <div className="w-full lg:flex-1">
+              {accountType === "gutv" && (
+                <div className="w-full">
                 <div className="flex items-center">
-                  <Label htmlFor="year" className="md:text-lg lg:text-lg lg:ml-10">
-                    Год вступления в студию<span className="text-destructive">*</span>
+                  <Label
+                    htmlFor="year"
+                    className="md:text-lg lg:text-lg"
+                  >
+                    Год вступления в студию
+                    <span className="text-destructive">*</span>
                   </Label>
 
-                  <Select name="year" onValueChange={() => clearError("year")} disabled={isLoading}>
+                  <Select
+                    name="year"
+                    onValueChange={() => clearError("year")}
+                    disabled={isLoading}
+                  >
                     <SelectTrigger
                       className={`w-[100px] ml-auto lg:w-[100px] ${errors.year ? "border-destructive" : ""}`}
                     >
@@ -278,10 +358,16 @@ export function RegisterForm() {
                     {errors.year}
                   </p>
                 )}
-              </div>
+                </div>
+              )}
             </div>
 
-            <Button type="submit" className="w-full text-base lg:text-lg" size="lg" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full text-base lg:text-lg"
+              size="lg"
+              disabled={isLoading}
+            >
               {isLoading ? "Регистрация..." : "Зарегистрироваться"}
             </Button>
           </form>

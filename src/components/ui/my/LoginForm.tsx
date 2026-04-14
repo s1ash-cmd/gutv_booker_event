@@ -1,5 +1,10 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
 import { Button } from "@/components/ui/button";
@@ -8,11 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { authApi } from "@/lib/authApi";
-import { Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 function mapJwtToUser(token: string) {
   const base64Url = token.split(".")[1];

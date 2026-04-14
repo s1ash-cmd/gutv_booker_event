@@ -1,44 +1,47 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChevronLeft, Plus, X } from 'lucide-react';
-import { equipmentApi } from '@/lib/equipmentApi';
-import { EquipmentCategory } from '@/app/models/equipment/equipment'
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronLeft, Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { EquipmentCategory } from "@/app/models/equipment/equipment";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { equipmentApi } from "@/lib/equipmentApi";
+import { formatBackendErrorDetails } from "@/lib/userFacingMessages";
 
 const categoryNames: Record<EquipmentCategory, string> = {
-  [EquipmentCategory.Camera]: 'Камера',
-  [EquipmentCategory.Lens]: 'Объектив',
-  [EquipmentCategory.Card]: 'Карта памяти',
-  [EquipmentCategory.Battery]: 'Аккумулятор',
-  [EquipmentCategory.Charger]: 'Зарядное устройство',
-  [EquipmentCategory.Sound]: 'Звук',
-  [EquipmentCategory.Stand]: 'Штатив',
-  [EquipmentCategory.Light]: 'Свет',
-  [EquipmentCategory.Other]: 'Прочее',
+  [EquipmentCategory.Camera]: "Камера",
+  [EquipmentCategory.Lens]: "Объектив",
+  [EquipmentCategory.Card]: "Карта памяти",
+  [EquipmentCategory.Battery]: "Аккумулятор",
+  [EquipmentCategory.Charger]: "Зарядное устройство",
+  [EquipmentCategory.Sound]: "Звук",
+  [EquipmentCategory.Stand]: "Штатив",
+  [EquipmentCategory.Light]: "Свет",
+  [EquipmentCategory.Other]: "Прочее",
 };
 
 export default function CreateEquipmentPage() {
   const router = useRouter();
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<string>('');
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<string>("");
   const [osnova, setOsnova] = useState(false);
   const [itemCount, setItemCount] = useState(1);
-  const [attributes, setAttributes] = useState<Array<{ key: string; value: string }>>([]);
+  const [attributes, setAttributes] = useState<
+    Array<{ key: string; value: string }>
+  >([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -61,9 +64,7 @@ export default function CreateEquipmentPage() {
       newErrors.name = "Название должно содержать не менее 2 символов";
     }
 
-    if (!description || description.trim() === "") {
-      newErrors.description = "Описание не может быть пустым";
-    } else if (description.trim().length < 5) {
+    if (description.trim() !== "" && description.trim().length < 5) {
       newErrors.description = "Описание должно содержать не менее 5 символов";
     }
 
@@ -79,10 +80,12 @@ export default function CreateEquipmentPage() {
 
     attributes.forEach((attr, index) => {
       if (!attr.key.trim()) {
-        newErrors[`attr_key_${index}`] = "Название атрибута не может быть пустым";
+        newErrors[`attr_key_${index}`] =
+          "Название атрибута не может быть пустым";
       }
       if (!attr.value.trim()) {
-        newErrors[`attr_value_${index}`] = "Значение атрибута не может быть пустым";
+        newErrors[`attr_value_${index}`] =
+          "Значение атрибута не может быть пустым";
       }
     });
 
@@ -90,7 +93,7 @@ export default function CreateEquipmentPage() {
   };
 
   const addAttribute = () => {
-    setAttributes([...attributes, { key: '', value: '' }]);
+    setAttributes([...attributes, { key: "", value: "" }]);
   };
 
   const removeAttribute = (index: number) => {
@@ -100,7 +103,11 @@ export default function CreateEquipmentPage() {
     clearError(`attr_value_${index}`);
   };
 
-  const updateAttribute = (index: number, field: 'key' | 'value', value: string) => {
+  const updateAttribute = (
+    index: number,
+    field: "key" | "value",
+    value: string,
+  ) => {
     const newAttrs = [...attributes];
     newAttrs[index][field] = value;
     setAttributes(newAttrs);
@@ -122,7 +129,7 @@ export default function CreateEquipmentPage() {
       setLoading(true);
 
       const attributesObject: Record<string, any> = {};
-      attributes.forEach(attr => {
+      attributes.forEach((attr) => {
         if (attr.key.trim() && attr.value.trim()) {
           attributesObject[attr.key.trim()] = attr.value.trim();
         }
@@ -130,10 +137,13 @@ export default function CreateEquipmentPage() {
 
       const equipmentData = {
         name: name.trim(),
-        description: description.trim(),
+        description: description.trim() || undefined,
         category: parseInt(category) as EquipmentCategory,
         osnova: osnova,
-        attributes: Object.keys(attributesObject).length > 0 ? attributesObject : undefined
+        attributes:
+          Object.keys(attributesObject).length > 0
+            ? attributesObject
+            : undefined,
       };
 
       const result = await equipmentApi.create_model(equipmentData);
@@ -147,23 +157,26 @@ export default function CreateEquipmentPage() {
 
       router.push(`/equipment/${result.id}`);
     } catch (err: any) {
-      console.error('Ошибка создания оборудования:', err);
+      console.error("Ошибка создания оборудования:", err);
 
-      let errorMessage = 'Не удалось создать оборудование';
+      let errorMessage = "Не удалось создать оборудование";
 
       if (err.message) {
         errorMessage = err.message;
       }
 
       if (err.response) {
-        errorMessage = err.response.data?.message || err.response.data?.title || errorMessage;
+        errorMessage =
+          err.response.data?.message ||
+          err.response.data?.title ||
+          errorMessage;
       }
 
-      if (err.errors) {
-        const validationErrors = Object.entries(err.errors)
-          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-          .join('\n');
-        errorMessage = validationErrors || errorMessage;
+      const validationErrors = formatBackendErrorDetails(
+        err.errors ?? err.response?.data?.errors,
+      );
+      if (validationErrors) {
+        errorMessage = validationErrors;
       }
 
       setErrors({ form: errorMessage });
@@ -176,22 +189,23 @@ export default function CreateEquipmentPage() {
     <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            size="icon"
-          >
+          <Button variant="ghost" onClick={() => router.back()} size="icon">
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold">Создание оборудования</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold">
+              Создание оборудования
+            </h1>
             <p className="text-sm text-muted-foreground">
               Добавьте новую модель оборудования в каталог
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl p-6 space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-card border border-border rounded-xl p-6 space-y-6"
+        >
           {errors.form && (
             <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20">
               {errors.form}
@@ -208,38 +222,32 @@ export default function CreateEquipmentPage() {
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                clearError('name');
+                clearError("name");
               }}
               className={errors.name ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.name && (
-              <p className="text-sm text-destructive">
-                {errors.name}
-              </p>
+              <p className="text-sm text-destructive">{errors.name}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">
-              Описание <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="description">Описание</Label>
             <Textarea
               id="description"
-              placeholder="Подробное описание оборудования..."
+              placeholder="Подробное описание оборудования (необязательно)"
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
-                clearError('description');
+                clearError("description");
               }}
               rows={4}
               className={errors.description ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.description && (
-              <p className="text-sm text-destructive">
-                {errors.description}
-              </p>
+              <p className="text-sm text-destructive">{errors.description}</p>
             )}
           </div>
 
@@ -251,11 +259,13 @@ export default function CreateEquipmentPage() {
               value={category}
               onValueChange={(value) => {
                 setCategory(value);
-                clearError('category');
+                clearError("category");
               }}
               disabled={loading}
             >
-              <SelectTrigger className={errors.category ? "border-destructive" : ""}>
+              <SelectTrigger
+                className={errors.category ? "border-destructive" : ""}
+              >
                 <SelectValue placeholder="Выберите категорию" />
               </SelectTrigger>
               <SelectContent>
@@ -267,9 +277,7 @@ export default function CreateEquipmentPage() {
               </SelectContent>
             </Select>
             {errors.category && (
-              <p className="text-sm text-destructive">
-                {errors.category}
-              </p>
+              <p className="text-sm text-destructive">{errors.category}</p>
             )}
           </div>
 
@@ -286,18 +294,22 @@ export default function CreateEquipmentPage() {
               value={itemCount}
               onChange={(e) => {
                 setItemCount(parseInt(e.target.value) || 1);
-                clearError('itemCount');
+                clearError("itemCount");
               }}
               className={errors.itemCount ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.itemCount && (
-              <p className="text-sm text-destructive">
-                {errors.itemCount}
-              </p>
+              <p className="text-sm text-destructive">{errors.itemCount}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Будет создано {itemCount} {itemCount === 1 ? 'экземпляр' : itemCount > 1 && itemCount < 5 ? 'экземпляра' : 'экземпляров'} с уникальными инвентарными номерами
+              Будет создано {itemCount}{" "}
+              {itemCount === 1
+                ? "экземпляр"
+                : itemCount > 1 && itemCount < 5
+                  ? "экземпляра"
+                  : "экземпляров"}{" "}
+              с уникальными инвентарными номерами
             </p>
           </div>
 
@@ -340,8 +352,14 @@ export default function CreateEquipmentPage() {
                       <Input
                         placeholder="Название (например: Разрешение)"
                         value={attr.key}
-                        onChange={(e) => updateAttribute(index, 'key', e.target.value)}
-                        className={errors[`attr_key_${index}`] ? "border-destructive" : ""}
+                        onChange={(e) =>
+                          updateAttribute(index, "key", e.target.value)
+                        }
+                        className={
+                          errors[`attr_key_${index}`]
+                            ? "border-destructive"
+                            : ""
+                        }
                         disabled={loading}
                       />
                       {errors[`attr_key_${index}`] && (
@@ -355,8 +373,14 @@ export default function CreateEquipmentPage() {
                       <Input
                         placeholder="Значение (например: 45 МП)"
                         value={attr.value}
-                        onChange={(e) => updateAttribute(index, 'value', e.target.value)}
-                        className={errors[`attr_value_${index}`] ? "border-destructive" : ""}
+                        onChange={(e) =>
+                          updateAttribute(index, "value", e.target.value)
+                        }
+                        className={
+                          errors[`attr_value_${index}`]
+                            ? "border-destructive"
+                            : ""
+                        }
                         disabled={loading}
                       />
                       {errors[`attr_value_${index}`] && (
@@ -383,7 +407,8 @@ export default function CreateEquipmentPage() {
 
             {attributes.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Добавьте атрибуты для указания характеристик оборудования (разрешение, вес, размер матрицы и т.д.)
+                Добавьте атрибуты для указания характеристик оборудования
+                (разрешение, вес, размер матрицы и т.д.)
               </p>
             )}
           </div>
@@ -401,7 +426,7 @@ export default function CreateEquipmentPage() {
                   Создание...
                 </>
               ) : (
-                'Создать оборудование'
+                "Создать оборудование"
               )}
             </Button>
             <Button

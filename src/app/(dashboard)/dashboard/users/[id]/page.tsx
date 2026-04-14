@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
   Calendar,
@@ -12,15 +10,17 @@ import {
   Shield,
   User as UserIcon,
 } from "lucide-react";
-
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { BookingResponseDto } from "@/app/models/booking/booking";
+import type { UserResponseDto } from "@/app/models/user/user";
 import { AdminOnly } from "@/components/AdminOnly";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { bookingApi } from "@/lib/bookingApi";
-import { userApi } from "@/lib/userApi";
-import { BookingResponseDto } from "@/app/models/booking/booking";
-import { UserResponseDto } from "@/app/models/user/user";
 import { getAvatarUrl } from "@/lib/avatar";
+import { bookingApi } from "@/lib/bookingApi";
+import { getRoleLabel, hasRoninAccess } from "@/lib/roles";
+import { userApi } from "@/lib/userApi";
 import { cn } from "@/lib/utils";
 
 const statusNames: Record<string, string> = {
@@ -37,15 +37,10 @@ const statusColors: Record<string, string> = {
   Completed: "bg-blue-500",
 };
 
-const roleNames: Record<string, string> = {
-  Admin: "Администратор",
-  Ronin: "Ronin",
-  Osnova: "Основа",
-  User: "Пользователь",
-};
-
 function isNotFoundError(error: unknown): boolean {
-  const message = String((error as { message?: string })?.message ?? "").toLowerCase();
+  const message = String(
+    (error as { message?: string })?.message ?? "",
+  ).toLowerCase();
   const status = (error as { status?: number })?.status;
 
   return (
@@ -90,12 +85,16 @@ export default function UserDetailPage() {
           throw loadError;
         });
 
-      const [userData, bookingsData] = await Promise.all([userPromise, bookingsPromise]);
+      const [userData, bookingsData] = await Promise.all([
+        userPromise,
+        bookingsPromise,
+      ]);
       setUser(userData);
       setBookings(
         [...bookingsData].sort(
           (left, right) =>
-            new Date(right.creationTime).getTime() - new Date(left.creationTime).getTime(),
+            new Date(right.creationTime).getTime() -
+            new Date(left.creationTime).getTime(),
         ),
       );
     } catch (loadError: any) {
@@ -143,7 +142,11 @@ export default function UserDetailPage() {
       <AdminOnly>
         <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
           <div className="max-w-6xl mx-auto">
-            <Button variant="ghost" onClick={() => router.back()} className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="mb-6"
+            >
               <ChevronLeft className="w-4 h-4 mr-2" />
               Назад
             </Button>
@@ -177,12 +180,21 @@ export default function UserDetailPage() {
       <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center gap-4 overflow-hidden">
-            <Button variant="ghost" onClick={() => router.back()} size="icon" className="shrink-0">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              size="icon"
+              className="shrink-0"
+            >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="overflow-hidden">
-              <h1 className="text-2xl lg:text-3xl font-bold truncate">{user.name}</h1>
-              <p className="text-sm text-muted-foreground truncate">@{user.login}</p>
+              <h1 className="text-2xl lg:text-3xl font-bold truncate">
+                {user.name}
+              </h1>
+              <p className="text-sm text-muted-foreground truncate">
+                @{user.login}
+              </p>
             </div>
           </div>
 
@@ -202,7 +214,8 @@ export default function UserDetailPage() {
                       <AvatarFallback
                         className={cn(
                           "text-2xl font-bold",
-                          user.role === "Admin" && "bg-primary text-primary-foreground",
+                          user.role === "Admin" &&
+                            "bg-primary text-primary-foreground",
                         )}
                       >
                         {getInitials(user.name)}
@@ -213,19 +226,27 @@ export default function UserDetailPage() {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Ник</span>
-                    <span className="text-base font-semibold text-right break-words">{user.name}</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Ник
+                    </span>
+                    <span className="text-base font-semibold text-right break-words">
+                      {user.name}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Логин</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Логин
+                    </span>
                     <span className="text-base font-semibold text-right break-words">
                       {user.login}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Telegram</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Telegram
+                    </span>
                     {user.telegramUsername ? (
                       <a
                         href={`https://t.me/${user.telegramUsername}`}
@@ -243,28 +264,36 @@ export default function UserDetailPage() {
                   </div>
 
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Роль</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Роль
+                    </span>
                     <span className="text-base font-semibold text-right">
-                      {roleNames[user.role] || "Пользователь"}
+                      {getRoleLabel(user.role)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Есть Ronin</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Есть Ronin
+                    </span>
                     <span
                       className={cn(
                         "text-base font-semibold text-right",
-                        (user.role === "Ronin" || user.role === "Admin")
+                        hasRoninAccess(user.role)
                           ? "text-green-600 dark:text-green-400"
                           : "text-red-600 dark:text-red-400",
                       )}
                     >
-                      {user.role === "Ronin" || user.role === "Admin" ? "Да" : "Нет"}
+                      {hasRoninAccess(user.role)
+                        ? "Да"
+                        : "Нет"}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between py-3 gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">Статус</span>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Статус
+                    </span>
                     <span
                       className={cn(
                         "text-base font-semibold text-right",
@@ -284,12 +313,16 @@ export default function UserDetailPage() {
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Telegram</h2>
-                    <p className="text-sm text-muted-foreground">Контакт пользователя</p>
+                    <p className="text-sm text-muted-foreground">
+                      Контакт пользователя
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Username</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Username
+                    </p>
                     {user.telegramUsername ? (
                       <a
                         href={`https://t.me/${user.telegramUsername}`}
@@ -300,12 +333,18 @@ export default function UserDetailPage() {
                         {user.telegramUsername}
                       </a>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Не привязан</p>
+                      <p className="text-sm text-muted-foreground">
+                        Не привязан
+                      </p>
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Chat ID</p>
-                    <p className="text-sm font-mono break-all">{user.telegramChatId ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Chat ID
+                    </p>
+                    <p className="text-sm font-mono break-all">
+                      {user.telegramChatId ?? "—"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -317,18 +356,26 @@ export default function UserDetailPage() {
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Статистика</h2>
-                    <p className="text-sm text-muted-foreground">История бронирований</p>
+                    <p className="text-sm text-muted-foreground">
+                      История бронирований
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Всего бронирований</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Всего бронирований
+                    </p>
                     <p className="text-2xl font-bold">{bookings.length}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Последняя активность</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Последняя активность
+                    </p>
                     <p className="text-sm">
-                      {bookings[0] ? formatDateTime(bookings[0].creationTime) : "—"}
+                      {bookings[0]
+                        ? formatDateTime(bookings[0].creationTime)
+                        : "—"}
                     </p>
                   </div>
                 </div>
@@ -341,7 +388,9 @@ export default function UserDetailPage() {
                   <Clock className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">Прошлые бронирования</h2>
+                  <h2 className="text-lg font-semibold">
+                    Прошлые бронирования
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     Вся история заявок пользователя
                   </p>
@@ -368,7 +417,9 @@ export default function UserDetailPage() {
                     <button
                       key={booking.id}
                       type="button"
-                      onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}
+                      onClick={() =>
+                        router.push(`/dashboard/bookings/${booking.id}`)
+                      }
                       className="w-full text-left bg-secondary/20 hover:bg-secondary/35 border border-border rounded-xl p-4 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4 mb-3">
@@ -387,24 +438,37 @@ export default function UserDetailPage() {
                               #{booking.id}
                             </span>
                           </div>
-                          <p className="font-medium break-words">{booking.reason}</p>
+                          <p className="font-medium break-words">
+                            {booking.reason}
+                          </p>
                         </div>
                       </div>
 
                       <div className="grid md:grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Период</p>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Период
+                          </p>
                           <p>{formatDateTime(booking.startTime)}</p>
-                          <p className="text-muted-foreground">{formatDateTime(booking.endTime)}</p>
+                          <p className="text-muted-foreground">
+                            {formatDateTime(booking.endTime)}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Оборудование</p>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Оборудование
+                          </p>
                           <div className="space-y-1">
-                            {booking.equipmentModelIds.slice(0, 3).map((item) => (
-                              <div key={item.id} className="text-xs bg-background rounded px-2 py-1 inline-block mr-1 mb-1">
-                                {item.modelName}
-                              </div>
-                            ))}
+                            {booking.equipmentModelIds
+                              .slice(0, 3)
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="inline-block rounded-md border border-border/60 bg-secondary/40 px-2 py-1 text-xs text-foreground mr-1 mb-1"
+                                >
+                                  {item.modelName}
+                                </div>
+                              ))}
                             {booking.equipmentModelIds.length > 3 && (
                               <p className="text-xs text-muted-foreground">
                                 +{booking.equipmentModelIds.length - 3} ещё
@@ -424,7 +488,9 @@ export default function UserDetailPage() {
                                   Комментарий пользователя
                                 </span>
                               </div>
-                              <p className="break-words whitespace-pre-wrap">{booking.comment}</p>
+                              <p className="break-words whitespace-pre-wrap">
+                                {booking.comment}
+                              </p>
                             </div>
                           )}
                           {booking.adminComment && (
@@ -435,7 +501,9 @@ export default function UserDetailPage() {
                                   Комментарий администратора
                                 </span>
                               </div>
-                              <p className="break-words whitespace-pre-wrap">{booking.adminComment}</p>
+                              <p className="break-words whitespace-pre-wrap">
+                                {booking.adminComment}
+                              </p>
                             </div>
                           )}
                         </div>

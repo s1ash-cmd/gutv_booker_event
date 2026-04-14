@@ -1,18 +1,13 @@
 import { format } from "date-fns";
-import { BookingService } from "@/services/bookingService";
-import { UserService } from "@/services/userService";
+import { telegramBackendApi } from "../backendApi";
 import type { TelegramClient } from "../client";
 import type { ICommand } from "./types";
 
 export class BookingFilterCommand implements ICommand {
-  private readonly bookingService: BookingService;
-  private readonly userService: UserService;
   private readonly status: string;
   public readonly name: string;
 
   constructor(status: string, displayName: string) {
-    this.bookingService = new BookingService();
-    this.userService = new UserService();
     this.status = status;
     this.name = displayName;
   }
@@ -22,11 +17,12 @@ export class BookingFilterCommand implements ICommand {
     message: any,
   ): Promise<void> {
     const chatId = BigInt(message.chat.id);
-    const user = await this.userService.getUserByTelegramChatId(chatId);
+    const user = await telegramBackendApi.getUserByTelegramChatId(chatId);
     if (!user) return;
 
     try {
-      const allBookings = await this.bookingService.getBookingsByUser(user.id);
+      const allBookings =
+        await telegramBackendApi.getBookingsByTelegramChatId(chatId);
       let bookings = allBookings;
 
       if (this.status !== "all") {

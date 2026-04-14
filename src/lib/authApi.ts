@@ -119,9 +119,9 @@ export async function authenticatedGraphqlRequest<TData>(
 
   const runRequest = (accessToken: string) => {
     const requestKey = getRequestKey(query, variables, accessToken);
-    const inflightRequest = inflightAuthenticatedRequests.get(
-      requestKey,
-    ) as Promise<TData> | undefined;
+    const inflightRequest = inflightAuthenticatedRequests.get(requestKey) as
+      | Promise<TData>
+      | undefined;
 
     if (shouldDeduplicate && inflightRequest) {
       return inflightRequest;

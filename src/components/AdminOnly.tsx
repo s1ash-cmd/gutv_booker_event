@@ -1,9 +1,9 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
+import { ShieldX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { ShieldX } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function AdminOnly({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -30,7 +30,9 @@ export function AdminOnly({ children }: { children: React.ReactNode }) {
         <div className="text-center">
           <ShieldX className="w-16 h-16 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-bold">Доступ запрещен</h2>
-          <p className="text-muted-foreground mt-2">Эта страница доступна только администраторам</p>
+          <p className="text-muted-foreground mt-2">
+            Эта страница доступна только администраторам
+          </p>
         </div>
       </div>
     );

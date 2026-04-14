@@ -1,19 +1,28 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, Filter, X, AlertCircle, Calendar, User, Clock, Package } from 'lucide-react';
-import { bookingApi } from '@/lib/bookingApi';
-import { BookingResponseDto } from '@/app/models/booking/booking';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  AlertCircle,
+  Calendar,
+  Clock,
+  Filter,
+  Package,
+  Search,
+  User,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { BookingResponseDto } from "@/app/models/booking/booking";
+import { AdminOnly } from "@/components/AdminOnly";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,50 +30,53 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
-import { AdminOnly } from '@/components/AdminOnly';
+} from "@/components/ui/table";
+import { bookingApi } from "@/lib/bookingApi";
+import { formatWarningMessages } from "@/lib/userFacingMessages";
+import { cn } from "@/lib/utils";
 
 const statusNames: Record<string, string> = {
-  'Pending': 'Ожидает',
-  'Cancelled': 'Отменено',
-  'Approved': 'Одобрено',
-  'Completed': 'Завершено',
+  Pending: "Ожидает",
+  Cancelled: "Отменено",
+  Approved: "Одобрено",
+  Completed: "Завершено",
 };
 
 const statusColors: Record<string, string> = {
-  'Pending': 'bg-yellow-500',
-  'Cancelled': 'bg-red-500',
-  'Approved': 'bg-green-500',
-  'Completed': 'bg-blue-500',
+  Pending: "bg-yellow-500",
+  Cancelled: "bg-red-500",
+  Approved: "bg-green-500",
+  Completed: "bg-blue-500",
 };
 
 const statusFilterMap: Record<string, number> = {
-  'Pending': 0,
-  'Cancelled': 1,
-  'Approved': 2,
-  'Completed': 3,
+  Pending: 0,
+  Cancelled: 1,
+  Approved: 2,
+  Completed: 3,
 };
 
 function isNotFoundError(error: any): boolean {
   const message = String(error?.message ?? "").toLowerCase();
   return (
-    message.includes('не найдено') ||
-    message.includes('не найден') ||
-    message.includes('нет бронирований') ||
-    message.includes('no bookings') ||
+    message.includes("не найдено") ||
+    message.includes("не найден") ||
+    message.includes("нет бронирований") ||
+    message.includes("no bookings") ||
     error?.status === 404 ||
-    message.includes('not found')
+    message.includes("not found")
   );
 }
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<BookingResponseDto[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<BookingResponseDto[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<
+    BookingResponseDto[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('Pending');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("Pending");
   const router = useRouter();
 
   useEffect(() => {
@@ -86,7 +98,7 @@ export default function BookingsPage() {
       let data: BookingResponseDto[] = [];
 
       try {
-        if (selectedStatus !== 'all') {
+        if (selectedStatus !== "all") {
           const statusEnum = statusFilterMap[selectedStatus];
           data = await bookingApi.get_by_status(statusEnum);
         } else {
@@ -103,11 +115,12 @@ export default function BookingsPage() {
       setBookings(data);
       setFilteredBookings(data);
     } catch (err: any) {
-      console.error('Ошибка загрузки бронирований:', err);
+      console.error("Ошибка загрузки бронирований:", err);
       setError(
         isNotFoundError(err)
           ? null
-          : err?.message || 'Не удалось загрузить бронирования. Попробуйте позже.'
+          : err?.message ||
+              "Не удалось загрузить бронирования. Попробуйте позже.",
       );
       setBookings([]);
       setFilteredBookings([]);
@@ -133,7 +146,7 @@ export default function BookingsPage() {
         if (isNotFoundError(err)) {
           setFilteredBookings([]);
         } else {
-          console.error('Ошибка поиска по ID:', err);
+          console.error("Ошибка поиска по ID:", err);
           setFilteredBookings([]);
         }
       } finally {
@@ -141,34 +154,37 @@ export default function BookingsPage() {
       }
     } else {
       const lowerQuery = query.toLowerCase();
-      const filtered = bookings.filter(b =>
-        b.userName.toLowerCase().includes(lowerQuery) ||
-        b.login.toLowerCase().includes(lowerQuery) ||
-        b.reason.toLowerCase().includes(lowerQuery) ||
-        b.equipmentModelIds.some(eq => eq.modelName.toLowerCase().includes(lowerQuery))
+      const filtered = bookings.filter(
+        (b) =>
+          b.userName.toLowerCase().includes(lowerQuery) ||
+          b.login.toLowerCase().includes(lowerQuery) ||
+          b.reason.toLowerCase().includes(lowerQuery) ||
+          b.equipmentModelIds.some((eq) =>
+            eq.modelName.toLowerCase().includes(lowerQuery),
+          ),
       );
       setFilteredBookings(filtered);
     }
   }
 
   function clearFilters() {
-    setSearchQuery('');
-    setSelectedStatus('all');
+    setSearchQuery("");
+    setSelectedStatus("all");
     setError(null);
     loadBookings();
   }
 
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 
-  const hasActiveFilters = searchQuery || selectedStatus !== 'all';
+  const hasActiveFilters = searchQuery || selectedStatus !== "all";
 
   return (
     <AdminOnly>
@@ -222,10 +238,11 @@ export default function BookingsPage() {
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                 {searchQuery && (
                   <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                    {/^\d+$/.test(searchQuery.trim()) ? 'ID: ' : 'Поиск: '}"{searchQuery}"
+                    {/^\d+$/.test(searchQuery.trim()) ? "ID: " : "Поиск: "}"
+                    {searchQuery}"
                   </span>
                 )}
-                {selectedStatus !== 'all' && (
+                {selectedStatus !== "all" && (
                   <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
                     {statusNames[selectedStatus]}
                   </span>
@@ -241,7 +258,9 @@ export default function BookingsPage() {
                   <AlertCircle className="w-3 h-3 text-destructive" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-destructive mb-1">Произошла ошибка</p>
+                  <p className="text-sm font-medium text-destructive mb-1">
+                    Произошла ошибка
+                  </p>
                   <p className="text-sm text-destructive/80">{error}</p>
                   <Button
                     variant="outline"
@@ -273,13 +292,14 @@ export default function BookingsPage() {
                   <Calendar className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {hasActiveFilters ? 'Ничего не найдено' : 'Бронирования отсутствуют'}
+                  {hasActiveFilters
+                    ? "Ничего не найдено"
+                    : "Бронирования отсутствуют"}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   {hasActiveFilters
-                    ? 'Попробуйте изменить параметры поиска или фильтры'
-                    : 'В данный момент нет бронирований'
-                  }
+                    ? "Попробуйте изменить параметры поиска или фильтры"
+                    : "В данный момент нет бронирований"}
                 </p>
                 {hasActiveFilters && (
                   <Button variant="outline" onClick={clearFilters}>
@@ -294,34 +314,47 @@ export default function BookingsPage() {
                 {filteredBookings.map((booking) => (
                   <div
                     key={booking.id}
-                    onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}
+                    onClick={() =>
+                      router.push(`/dashboard/bookings/${booking.id}`)
+                    }
                     className="bg-card border border-border rounded-xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          statusColors[booking.status] || 'bg-gray-500'
-                        )}></div>
+                        <div
+                          className={cn(
+                            "w-2 h-2 rounded-full",
+                            statusColors[booking.status] || "bg-gray-500",
+                          )}
+                        ></div>
                         <span className="text-sm font-medium">
                           {statusNames[booking.status] || booking.status}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-mono">#{booking.id}</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        #{booking.id}
+                      </span>
                     </div>
 
-                    {Object.keys(booking.warnings).length > 0 && (
+                    {formatWarningMessages(booking.warnings).length > 0 && (
                       <div className="mb-3 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 mb-1">
                           <AlertCircle className="w-3 h-3 text-orange-600 dark:text-orange-400" />
-                          <p className="text-xs font-medium text-orange-600 dark:text-orange-400">Предупреждения</p>
+                          <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
+                            Предупреждения
+                          </p>
                         </div>
                         <div className="space-y-1">
-                          {Object.entries(booking.warnings).map(([key, value]) => (
-                            <p key={key} className="text-xs text-orange-600 dark:text-orange-400">
-                              {key}: {String(value)}
-                            </p>
-                          ))}
+                          {formatWarningMessages(booking.warnings).map(
+                            (message) => (
+                              <p
+                                key={message}
+                                className="text-xs text-orange-600 dark:text-orange-400"
+                              >
+                                {message}
+                              </p>
+                            ),
+                          )}
                         </div>
                       </div>
                     )}
@@ -330,21 +363,31 @@ export default function BookingsPage() {
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{booking.userName}</p>
-                          <p className="text-xs text-muted-foreground">@{booking.login}</p>
+                          <p className="font-medium text-sm truncate">
+                            {booking.userName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            @{booking.login}
+                          </p>
                         </div>
                       </div>
 
                       <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                        <p className="text-xs text-muted-foreground mb-1">Причина</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Причина
+                        </p>
                         <p className="text-sm line-clamp-2">{booking.reason}</p>
                       </div>
 
                       <div className="flex items-center gap-2 text-xs">
                         <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
-                          <p className="truncate">{formatDateTime(booking.startTime)}</p>
-                          <p className="text-muted-foreground truncate">{formatDateTime(booking.endTime)}</p>
+                          <p className="truncate">
+                            {formatDateTime(booking.startTime)}
+                          </p>
+                          <p className="text-muted-foreground truncate">
+                            {formatDateTime(booking.endTime)}
+                          </p>
                         </div>
                       </div>
 
@@ -357,11 +400,16 @@ export default function BookingsPage() {
                             </span>
                           </div>
                           <div className="space-y-1">
-                            {booking.equipmentModelIds.slice(0, 2).map((item) => (
-                              <div key={item.id} className="text-xs bg-secondary/20 rounded px-2 py-1">
-                                {item.modelName}
-                              </div>
-                            ))}
+                            {booking.equipmentModelIds
+                              .slice(0, 2)
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="text-xs bg-secondary/20 rounded px-2 py-1"
+                                >
+                                  {item.modelName}
+                                </div>
+                              ))}
                             {booking.equipmentModelIds.length > 2 && (
                               <div className="text-xs text-muted-foreground">
                                 +{booking.equipmentModelIds.length - 2} ещё
@@ -375,14 +423,20 @@ export default function BookingsPage() {
                         <div className="pt-2 border-t border-border space-y-1">
                           {booking.comment && (
                             <div className="text-xs bg-blue-500/10 border border-blue-500/20 rounded px-2 py-1">
-                              <p className="text-blue-600 dark:text-blue-400 font-medium mb-0.5">Пользователь:</p>
+                              <p className="text-blue-600 dark:text-blue-400 font-medium mb-0.5">
+                                Пользователь:
+                              </p>
                               <p className="line-clamp-2">{booking.comment}</p>
                             </div>
                           )}
                           {booking.adminComment && (
                             <div className="text-xs bg-purple-500/10 border border-purple-500/20 rounded px-2 py-1">
-                              <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">Админ:</p>
-                              <p className="line-clamp-2">{booking.adminComment}</p>
+                              <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">
+                                Админ:
+                              </p>
+                              <p className="line-clamp-2">
+                                {booking.adminComment}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -402,8 +456,12 @@ export default function BookingsPage() {
                       <TableHead className="max-w-[200px]">Причина</TableHead>
                       <TableHead>Период</TableHead>
                       <TableHead>Оборудование</TableHead>
-                      <TableHead className="max-w-[200px]">Комментарии</TableHead>
-                      <TableHead className="w-[200px]">Предупреждения</TableHead>
+                      <TableHead className="max-w-[200px]">
+                        Комментарии
+                      </TableHead>
+                      <TableHead className="w-[200px]">
+                        Предупреждения
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -411,17 +469,21 @@ export default function BookingsPage() {
                       <TableRow
                         key={booking.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}
+                        onClick={() =>
+                          router.push(`/dashboard/bookings/${booking.id}`)
+                        }
                       >
                         <TableCell className="font-mono text-muted-foreground">
                           #{booking.id}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              statusColors[booking.status] || 'bg-gray-500'
-                            )}></div>
+                            <div
+                              className={cn(
+                                "w-2 h-2 rounded-full",
+                                statusColors[booking.status] || "bg-gray-500",
+                              )}
+                            ></div>
                             <span className="text-sm">
                               {statusNames[booking.status] || booking.status}
                             </span>
@@ -430,25 +492,39 @@ export default function BookingsPage() {
                         <TableCell>
                           <div>
                             <p className="font-medium">{booking.userName}</p>
-                            <p className="text-xs text-muted-foreground">@{booking.login}</p>
+                            <p className="text-xs text-muted-foreground">
+                              @{booking.login}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <p className="line-clamp-2 max-w-[200px]" title={booking.reason}>{booking.reason}</p>
+                          <p
+                            className="line-clamp-2 max-w-[200px]"
+                            title={booking.reason}
+                          >
+                            {booking.reason}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm whitespace-nowrap">
                             <p>{formatDateTime(booking.startTime)}</p>
-                            <p className="text-muted-foreground">{formatDateTime(booking.endTime)}</p>
+                            <p className="text-muted-foreground">
+                              {formatDateTime(booking.endTime)}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            {booking.equipmentModelIds.slice(0, 2).map((item) => (
-                              <div key={item.id} className="text-xs bg-secondary/30 rounded px-2 py-1">
-                                {item.modelName}
-                              </div>
-                            ))}
+                            {booking.equipmentModelIds
+                              .slice(0, 2)
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="text-xs bg-secondary/30 rounded px-2 py-1"
+                                >
+                                  {item.modelName}
+                                </div>
+                              ))}
                             {booking.equipmentModelIds.length > 2 && (
                               <p className="text-xs text-muted-foreground">
                                 +{booking.equipmentModelIds.length - 2} ещё
@@ -460,34 +536,52 @@ export default function BookingsPage() {
                           <div className="space-y-1 max-w-[200px]">
                             {booking.comment && (
                               <div className="text-xs bg-blue-500/10 border border-blue-500/20 rounded px-2 py-1">
-                                <p className="text-blue-600 dark:text-blue-400 font-medium mb-0.5">Пользователь:</p>
-                                <p className="line-clamp-2">{booking.comment}</p>
+                                <p className="text-blue-600 dark:text-blue-400 font-medium mb-0.5">
+                                  Пользователь:
+                                </p>
+                                <p className="line-clamp-2">
+                                  {booking.comment}
+                                </p>
                               </div>
                             )}
                             {booking.adminComment && (
                               <div className="text-xs bg-purple-500/10 border border-purple-500/20 rounded px-2 py-1">
-                                <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">Админ:</p>
-                                <p className="line-clamp-2">{booking.adminComment}</p>
+                                <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">
+                                  Админ:
+                                </p>
+                                <p className="line-clamp-2">
+                                  {booking.adminComment}
+                                </p>
                               </div>
                             )}
                             {!booking.comment && !booking.adminComment && (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {Object.keys(booking.warnings).length > 0 ? (
+                          {formatWarningMessages(booking.warnings).length >
+                          0 ? (
                             <div className="space-y-1 w-full">
-                              {Object.entries(booking.warnings).map(([key, value]) => (
-                                <div key={key} className="text-xs bg-orange-500/10 border border-orange-500/20 rounded px-2 py-1">
-                                  <p className="text-orange-600 dark:text-orange-400 font-medium break-words whitespace-normal">
-                                    {key}: {String(value)}
-                                  </p>
-                                </div>
-                              ))}
+                              {formatWarningMessages(booking.warnings).map(
+                                (message) => (
+                                  <div
+                                    key={message}
+                                    className="text-xs bg-orange-500/10 border border-orange-500/20 rounded px-2 py-1"
+                                  >
+                                    <p className="text-orange-600 dark:text-orange-400 font-medium break-words whitespace-normal">
+                                      {message}
+                                    </p>
+                                  </div>
+                                ),
+                              )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -495,7 +589,6 @@ export default function BookingsPage() {
                   </TableBody>
                 </Table>
               </div>
-
             </>
           )}
         </div>

@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
   Calendar,
+  CheckCheck,
+  CheckCircle,
+  ChevronLeft,
   Clock,
   MessageSquare,
-  ChevronLeft,
-  CheckCircle,
   XCircle,
-  CheckCheck,
 } from "lucide-react";
-import { eventApi } from "@/lib/eventApi";
-import { EventResponseDto } from "@/app/models/event/event";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { EventResponseDto } from "@/app/models/event/event";
+import { AdminOnly } from "@/components/AdminOnly";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -24,8 +23,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { eventApi } from "@/lib/eventApi";
+import { formatWarningMessages } from "@/lib/userFacingMessages";
 import { cn } from "@/lib/utils";
-import { AdminOnly } from "@/components/AdminOnly";
 
 const statusNames: Record<string, string> = {
   Pending: "Ожидает",
@@ -152,7 +153,11 @@ export default function EventDetailPage() {
       <AdminOnly>
         <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
           <div className="max-w-4xl mx-auto">
-            <Button variant="ghost" onClick={() => router.back()} className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="mb-6"
+            >
               <ChevronLeft className="w-4 h-4 mr-2" />
               Назад
             </Button>
@@ -218,7 +223,7 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {Object.keys(event.warnings).length > 0 && (
+          {formatWarningMessages(event.warnings).length > 0 && (
             <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
@@ -227,12 +232,12 @@ export default function EventDetailPage() {
                     Предупреждения
                   </p>
                   <div className="space-y-1">
-                    {Object.entries(event.warnings).map(([key, value]) => (
+                    {formatWarningMessages(event.warnings).map((message) => (
                       <p
-                        key={key}
+                        key={message}
                         className="text-sm text-orange-600 dark:text-orange-400 break-words"
                       >
-                        <span className="font-medium">{key}:</span> {String(value)}
+                        {message}
                       </p>
                     ))}
                   </div>
@@ -249,7 +254,9 @@ export default function EventDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-lg font-semibold">Заявка</h2>
-                  <p className="text-sm text-muted-foreground">Основная информация</p>
+                  <p className="text-sm text-muted-foreground">
+                    Основная информация
+                  </p>
                 </div>
               </div>
               <div className="space-y-3">
@@ -259,7 +266,9 @@ export default function EventDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-xs text-muted-foreground mb-1">Причина</p>
-                  <p className="text-sm break-words whitespace-pre-wrap">{event.reason}</p>
+                  <p className="text-sm break-words whitespace-pre-wrap">
+                    {event.reason}
+                  </p>
                 </div>
               </div>
             </div>
@@ -271,21 +280,31 @@ export default function EventDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-lg font-semibold">Время</h2>
-                  <p className="text-sm text-muted-foreground">Период проведения</p>
+                  <p className="text-sm text-muted-foreground">
+                    Период проведения
+                  </p>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="overflow-hidden">
                   <p className="text-xs text-muted-foreground mb-1">Создано</p>
-                  <p className="text-sm truncate">{formatDateTime(event.creationTime)}</p>
+                  <p className="text-sm truncate">
+                    {formatDateTime(event.creationTime)}
+                  </p>
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-xs text-muted-foreground mb-1">Начало</p>
-                  <p className="text-sm font-medium truncate">{formatDateTime(event.startTime)}</p>
+                  <p className="text-sm font-medium truncate">
+                    {formatDateTime(event.startTime)}
+                  </p>
                 </div>
                 <div className="overflow-hidden">
-                  <p className="text-xs text-muted-foreground mb-1">Окончание</p>
-                  <p className="text-sm font-medium truncate">{formatDateTime(event.endTime)}</p>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Окончание
+                  </p>
+                  <p className="text-sm font-medium truncate">
+                    {formatDateTime(event.endTime)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -299,7 +318,9 @@ export default function EventDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-lg font-semibold">Комментарии</h2>
-                  <p className="text-sm text-muted-foreground">Переписка по заявке</p>
+                  <p className="text-sm text-muted-foreground">
+                    Переписка по заявке
+                  </p>
                 </div>
               </div>
               <div className="space-y-3">
@@ -308,7 +329,9 @@ export default function EventDetailPage() {
                     <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
                       Комментарий пользователя:
                     </p>
-                    <p className="text-sm break-words whitespace-pre-wrap">{event.comment}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      {event.comment}
+                    </p>
                   </div>
                 )}
                 {event.adminComment && (
@@ -316,7 +339,9 @@ export default function EventDetailPage() {
                     <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-2">
                       Комментарий администратора:
                     </p>
-                    <p className="text-sm break-words whitespace-pre-wrap">{event.adminComment}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      {event.adminComment}
+                    </p>
                   </div>
                 )}
               </div>
@@ -439,12 +464,16 @@ export default function EventDetailPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+          <Dialog
+            open={showCompleteDialog}
+            onOpenChange={setShowCompleteDialog}
+          >
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Завершить заявку</DialogTitle>
                 <DialogDescription>
-                  Подтвердите завершение event. После этого заявка перейдёт в статус завершённой.
+                  Подтвердите завершение event. После этого заявка перейдёт в
+                  статус завершённой.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="flex-col sm:flex-row gap-2">

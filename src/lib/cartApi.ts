@@ -1,13 +1,13 @@
-import {
+import type { BookingResponseDto } from "@/app/models/booking/booking";
+import type {
   CartResponseDto,
   UpdateCartDetailsDto,
 } from "@/app/models/cart/cart";
 import {
+  type EqModelResponseDto,
   EquipmentAccess,
   EquipmentCategory,
-  EqModelResponseDto,
 } from "@/app/models/equipment/equipment";
-import { BookingResponseDto } from "@/app/models/booking/booking";
 import { authenticatedGraphqlRequest } from "./authApi";
 
 type GraphqlCart = {
@@ -234,7 +234,9 @@ export const cartApi = {
   },
 
   set_cart_details: async (input: UpdateCartDetailsDto) => {
-    const data = await authenticatedGraphqlRequest<{ setCartDetails: GraphqlCart }>(
+    const data = await authenticatedGraphqlRequest<{
+      setCartDetails: GraphqlCart;
+    }>(
       `
         mutation SetCartDetails($input: UpdateCartDetailsInput!) {
           setCartDetails(input: $input) {
@@ -256,7 +258,9 @@ export const cartApi = {
   },
 
   add_cart_item: async (eqModelId: number, quantity: number) => {
-    const data = await authenticatedGraphqlRequest<{ addCartItem: GraphqlCart }>(
+    const data = await authenticatedGraphqlRequest<{
+      addCartItem: GraphqlCart;
+    }>(
       `
         mutation AddCartItem($eqModelId: Int!, $quantity: Int!) {
           addCartItem(eqModelId: $eqModelId, quantity: $quantity) {
@@ -288,7 +292,9 @@ export const cartApi = {
   },
 
   remove_cart_item: async (eqModelId: number) => {
-    const data = await authenticatedGraphqlRequest<{ removeCartItem: GraphqlCart }>(
+    const data = await authenticatedGraphqlRequest<{
+      removeCartItem: GraphqlCart;
+    }>(
       `
         mutation RemoveCartItem($eqModelId: Int!) {
           removeCartItem(eqModelId: $eqModelId) {

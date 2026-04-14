@@ -1,7 +1,7 @@
 export enum EquipmentAccess {
   User = 0,
   Osnova = 1,
-  Ronin = 2
+  Ronin = 2,
 }
 
 export enum EquipmentCategory {
@@ -13,12 +13,12 @@ export enum EquipmentCategory {
   Sound = 5,
   Stand = 6,
   Light = 7,
-  Other = 8
+  Other = 8,
 }
 
 export interface CreateEqModelRequestDto {
   name: string;
-  description: string;
+  description?: string;
   category: EquipmentCategory;
   osnova: boolean;
   attributes?: Record<string, any>;

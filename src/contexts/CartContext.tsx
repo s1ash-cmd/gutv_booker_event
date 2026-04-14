@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { BookingResponseDto } from "@/app/models/booking/booking";
 import type {
   CartDetailsDto,
@@ -9,13 +16,7 @@ import type {
 } from "@/app/models/cart/cart";
 import type { EqModelResponseDto } from "@/app/models/equipment/equipment";
 import { cartApi } from "@/lib/cartApi";
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { canBookEquipment } from "@/lib/roles";
 import { useAuth } from "./AuthContext";
 
 interface CartItem {
@@ -60,7 +61,7 @@ function cartItemsToRecord(items: CartItemDto[]): Record<number, CartItem> {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { isAuth, isLoading: isAuthLoading } = useAuth();
+  const { user, isAuth, isLoading: isAuthLoading } = useAuth();
   const [cart, setCart] = useState<Record<number, CartItem>>({});
   const [cartDetails, setCartDetailsState] =
     useState<CartDetailsDto>(emptyCartDetails);
@@ -80,10 +81,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!isAuth) {
       throw new Error("Для работы с корзиной войдите в аккаунт");
     }
+
+    if (!canBookEquipment(user?.role)) {
+      throw new Error(
+        "Представителям организаций недоступно бронирование оборудования",
+      );
+    }
   };
 
   const refreshCart = async () => {
-    if (!isAuth) {
+    if (!isAuth || !canBookEquipment(user?.role)) {
       setCart({});
       setCartDetailsState(emptyCartDetails);
       setIsCartLoading(false);
@@ -105,7 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     void refreshCart();
-  }, [isAuth, isAuthLoading]);
+  }, [isAuth, isAuthLoading, user?.role]);
 
   const addToCart = async (model: EqModelResponseDto) => {
     ensureAuthenticated();
@@ -143,7 +150,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const remoteCart = await cartApi.update_cart_item_quantity(modelId, quantity);
+    const remoteCart = await cartApi.update_cart_item_quantity(
+      modelId,
+      quantity,
+    );
     applyCart(remoteCart);
   };
 

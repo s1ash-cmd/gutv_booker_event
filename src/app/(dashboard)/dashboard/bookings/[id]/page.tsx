@@ -1,26 +1,23 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import {
   AlertCircle,
+  Ban,
   Calendar,
-  User,
-  Clock,
-  Package,
-  MessageSquare,
-  ChevronLeft,
-  CheckCircle,
-  XCircle,
   CheckCheck,
-  Ban
-} from 'lucide-react';
-import { bookingApi } from '@/lib/bookingApi';
-import { userApi } from '@/lib/userApi';
-import { BookingResponseDto } from '@/app/models/booking/booking';
-import { UserResponseDto } from '@/app/models/user/user';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  MessageSquare,
+  Package,
+  User,
+  XCircle,
+} from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { BookingResponseDto } from "@/app/models/booking/booking";
+import type { UserResponseDto } from "@/app/models/user/user";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -28,21 +25,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { bookingApi } from "@/lib/bookingApi";
+import { userApi } from "@/lib/userApi";
+import { formatWarningMessages } from "@/lib/userFacingMessages";
+import { cn } from "@/lib/utils";
 
 const statusNames: Record<string, string> = {
-  'Pending': 'Ожидает',
-  'Cancelled': 'Отменено',
-  'Approved': 'Одобрено',
-  'Completed': 'Завершено',
+  Pending: "Ожидает",
+  Cancelled: "Отменено",
+  Approved: "Одобрено",
+  Completed: "Завершено",
 };
 
 const statusColors: Record<string, string> = {
-  'Pending': 'bg-yellow-500',
-  'Cancelled': 'bg-red-500',
-  'Approved': 'bg-green-500',
-  'Completed': 'bg-blue-500',
+  Pending: "bg-yellow-500",
+  Cancelled: "bg-red-500",
+  Approved: "bg-green-500",
+  Completed: "bg-blue-500",
 };
 
 export default function BookingDetailPage() {
@@ -60,7 +61,7 @@ export default function BookingDetailPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [adminComment, setAdminComment] = useState('');
+  const [adminComment, setAdminComment] = useState("");
 
   useEffect(() => {
     loadCurrentUser();
@@ -74,7 +75,7 @@ export default function BookingDetailPage() {
       const user = await userApi.get_me();
       setCurrentUser(user);
     } catch (err: any) {
-      console.error('Ошибка загрузки текущего пользователя:', err);
+      console.error("Ошибка загрузки текущего пользователя:", err);
     }
   }
 
@@ -85,8 +86,8 @@ export default function BookingDetailPage() {
       const data = await bookingApi.get_by_id(bookingId);
       setBooking(data);
     } catch (err: any) {
-      console.error('Ошибка загрузки бронирования:', err);
-      setError(err?.message || 'Не удалось загрузить бронирование');
+      console.error("Ошибка загрузки бронирования:", err);
+      setError(err?.message || "Не удалось загрузить бронирование");
     } finally {
       setLoading(false);
     }
@@ -97,11 +98,11 @@ export default function BookingDetailPage() {
       setActionLoading(true);
       await bookingApi.approve(bookingId, adminComment);
       setShowApproveDialog(false);
-      setAdminComment('');
+      setAdminComment("");
       await loadBooking();
     } catch (err: any) {
-      console.error('Ошибка одобрения:', err);
-      setError(err?.message || 'Не удалось одобрить бронирование');
+      console.error("Ошибка одобрения:", err);
+      setError(err?.message || "Не удалось одобрить бронирование");
     } finally {
       setActionLoading(false);
     }
@@ -112,11 +113,11 @@ export default function BookingDetailPage() {
       setActionLoading(true);
       await bookingApi.reject(bookingId, adminComment);
       setShowRejectDialog(false);
-      setAdminComment('');
+      setAdminComment("");
       await loadBooking();
     } catch (err: any) {
-      console.error('Ошибка отклонения:', err);
-      setError(err?.message || 'Не удалось отклонить бронирование');
+      console.error("Ошибка отклонения:", err);
+      setError(err?.message || "Не удалось отклонить бронирование");
     } finally {
       setActionLoading(false);
     }
@@ -127,11 +128,11 @@ export default function BookingDetailPage() {
       setActionLoading(true);
       await bookingApi.cancel(bookingId, adminComment || undefined);
       setShowCancelDialog(false);
-      setAdminComment('');
+      setAdminComment("");
       await loadBooking();
     } catch (err: any) {
-      console.error('Ошибка отмены:', err);
-      setError(err?.message || 'Не удалось отменить бронирование');
+      console.error("Ошибка отмены:", err);
+      setError(err?.message || "Не удалось отменить бронирование");
     } finally {
       setActionLoading(false);
     }
@@ -144,8 +145,8 @@ export default function BookingDetailPage() {
       setShowCompleteDialog(false);
       await loadBooking();
     } catch (err: any) {
-      console.error('Ошибка завершения:', err);
-      setError(err?.message || 'Не удалось завершить бронирование');
+      console.error("Ошибка завершения:", err);
+      setError(err?.message || "Не удалось завершить бронирование");
     } finally {
       setActionLoading(false);
     }
@@ -153,17 +154,17 @@ export default function BookingDetailPage() {
 
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 
   function isAdmin() {
-    return currentUser?.role === 'Admin';
+    return currentUser?.role === "Admin";
   }
 
   function isOwner() {
@@ -206,12 +207,12 @@ export default function BookingDetailPage() {
                 <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                 <div className="overflow-hidden">
                   <p className="text-sm font-medium text-destructive mb-1">
-                    {error || 'Бронирование не найдено'}
+                    {error || "Бронирование не найдено"}
                   </p>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push('/dashboard/bookings')}
+                    onClick={() => router.push("/dashboard/bookings")}
                     className="mt-3"
                   >
                     Вернуться к списку
@@ -248,10 +249,12 @@ export default function BookingDetailPage() {
                     #{booking.id}
                   </span>
                   <span className="text-muted-foreground">•</span>
-                  <div className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
-                    statusColors[booking.status] || 'bg-gray-500'
-                  )}></div>
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      statusColors[booking.status] || "bg-gray-500",
+                    )}
+                  ></div>
                   <span className="text-sm text-muted-foreground">
                     {statusNames[booking.status] || booking.status}
                   </span>
@@ -260,7 +263,7 @@ export default function BookingDetailPage() {
             </div>
           </div>
 
-          {Object.keys(booking.warnings).length > 0 && (
+          {formatWarningMessages(booking.warnings).length > 0 && (
             <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
@@ -269,9 +272,12 @@ export default function BookingDetailPage() {
                     Предупреждения
                   </p>
                   <div className="space-y-1">
-                    {Object.entries(booking.warnings).map(([key, value]) => (
-                      <p key={key} className="text-sm text-orange-600 dark:text-orange-400 break-words">
-                        <span className="font-medium">{key}:</span> {String(value)}
+                    {formatWarningMessages(booking.warnings).map((message) => (
+                      <p
+                        key={message}
+                        className="text-sm text-orange-600 dark:text-orange-400 break-words"
+                      >
+                        {message}
                       </p>
                     ))}
                   </div>
@@ -288,7 +294,9 @@ export default function BookingDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-lg font-semibold">Пользователь</h2>
-                  <p className="text-sm text-muted-foreground">Информация о заказчике</p>
+                  <p className="text-sm text-muted-foreground">
+                    Информация о заказчике
+                  </p>
                 </div>
               </div>
               <div className="space-y-3">
@@ -302,7 +310,9 @@ export default function BookingDetailPage() {
                 </div>
                 {booking.telegramUsername && (
                   <div className="overflow-hidden">
-                    <p className="text-xs text-muted-foreground mb-1">Telegram</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Telegram
+                    </p>
                     <a
                       href={`https://t.me/${booking.telegramUsername}`}
                       target="_blank"
@@ -323,21 +333,31 @@ export default function BookingDetailPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-lg font-semibold">Время</h2>
-                  <p className="text-sm text-muted-foreground">Период бронирования</p>
+                  <p className="text-sm text-muted-foreground">
+                    Период бронирования
+                  </p>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="overflow-hidden">
                   <p className="text-xs text-muted-foreground mb-1">Создано</p>
-                  <p className="text-sm truncate">{formatDateTime(booking.creationTime)}</p>
+                  <p className="text-sm truncate">
+                    {formatDateTime(booking.creationTime)}
+                  </p>
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-xs text-muted-foreground mb-1">Начало</p>
-                  <p className="text-sm font-medium truncate">{formatDateTime(booking.startTime)}</p>
+                  <p className="text-sm font-medium truncate">
+                    {formatDateTime(booking.startTime)}
+                  </p>
                 </div>
                 <div className="overflow-hidden">
-                  <p className="text-xs text-muted-foreground mb-1">Окончание</p>
-                  <p className="text-sm font-medium truncate">{formatDateTime(booking.endTime)}</p>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Окончание
+                  </p>
+                  <p className="text-sm font-medium truncate">
+                    {formatDateTime(booking.endTime)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -365,7 +385,10 @@ export default function BookingDetailPage() {
                     <div className="overflow-hidden flex-1">
                       <p className="font-medium truncate">{item.modelName}</p>
                       <p className="text-xs text-muted-foreground mt-1 truncate">
-                        Инв. номер: <span className="font-mono">{item.inventoryNumber}</span>
+                        Инв. номер:{" "}
+                        <span className="font-mono">
+                          {item.inventoryNumber}
+                        </span>
                       </p>
                     </div>
                     {item.isReturned && (
@@ -377,10 +400,14 @@ export default function BookingDetailPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                    <span className="truncate max-w-[45%]">{formatDateTime(item.startDate)}</span>
-                    <span className="shrink-0">→</span>
-                    <span className="truncate max-w-[45%]">{formatDateTime(item.endDate)}</span>
+                  <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+                    <span className="break-words">
+                      {formatDateTime(item.startDate)}
+                    </span>
+                    <span className="hidden shrink-0 sm:inline">→</span>
+                    <span className="break-words">
+                      {formatDateTime(item.endDate)}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -396,7 +423,9 @@ export default function BookingDetailPage() {
                     <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
                       Комментарий пользователя:
                     </p>
-                    <p className="text-sm break-words whitespace-pre-wrap">{booking.comment}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      {booking.comment}
+                    </p>
                   </div>
                 )}
                 {booking.adminComment && (
@@ -404,7 +433,9 @@ export default function BookingDetailPage() {
                     <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-2">
                       Комментарий администратора:
                     </p>
-                    <p className="text-sm break-words whitespace-pre-wrap">{booking.adminComment}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      {booking.adminComment}
+                    </p>
                   </div>
                 )}
               </div>
@@ -415,7 +446,7 @@ export default function BookingDetailPage() {
             <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
               <h2 className="text-lg font-semibold mb-4">Действия</h2>
               <div className="grid sm:grid-cols-2 gap-3">
-                {isAdmin() && booking.status === 'Pending' && (
+                {isAdmin() && booking.status === "Pending" && (
                   <>
                     <Button
                       onClick={() => setShowApproveDialog(true)}
@@ -437,7 +468,7 @@ export default function BookingDetailPage() {
                   </>
                 )}
 
-                {isAdmin() && booking.status === 'Approved' && (
+                {isAdmin() && booking.status === "Approved" && (
                   <Button
                     onClick={() => setShowCompleteDialog(true)}
                     disabled={actionLoading}
@@ -449,17 +480,19 @@ export default function BookingDetailPage() {
                   </Button>
                 )}
 
-                {isOwner() && (booking.status === 'Pending' || booking.status === 'Approved') && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCancelDialog(true)}
-                    disabled={actionLoading}
-                    className="w-full sm:col-span-2"
-                  >
-                    <Ban className="w-4 h-4 mr-2 shrink-0" />
-                    <span className="truncate">Отменить бронирование</span>
-                  </Button>
-                )}
+                {isOwner() &&
+                  (booking.status === "Pending" ||
+                    booking.status === "Approved") && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCancelDialog(true)}
+                      disabled={actionLoading}
+                      className="w-full sm:col-span-2"
+                    >
+                      <Ban className="w-4 h-4 mr-2 shrink-0" />
+                      <span className="truncate">Отменить бронирование</span>
+                    </Button>
+                  )}
               </div>
             </div>
           )}
@@ -484,7 +517,7 @@ export default function BookingDetailPage() {
                   variant="outline"
                   onClick={() => {
                     setShowApproveDialog(false);
-                    setAdminComment('');
+                    setAdminComment("");
                   }}
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
@@ -496,7 +529,7 @@ export default function BookingDetailPage() {
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'Обработка...' : 'Одобрить'}
+                  {actionLoading ? "Обработка..." : "Одобрить"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -523,7 +556,7 @@ export default function BookingDetailPage() {
                   variant="outline"
                   onClick={() => {
                     setShowRejectDialog(false);
-                    setAdminComment('');
+                    setAdminComment("");
                   }}
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
@@ -536,7 +569,7 @@ export default function BookingDetailPage() {
                   disabled={actionLoading || !adminComment.trim()}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'Обработка...' : 'Отклонить'}
+                  {actionLoading ? "Обработка..." : "Отклонить"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -562,7 +595,7 @@ export default function BookingDetailPage() {
                   variant="outline"
                   onClick={() => {
                     setShowCancelDialog(false);
-                    setAdminComment('');
+                    setAdminComment("");
                   }}
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
@@ -575,18 +608,22 @@ export default function BookingDetailPage() {
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'Обработка...' : 'Отменить бронирование'}
+                  {actionLoading ? "Обработка..." : "Отменить бронирование"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+          <Dialog
+            open={showCompleteDialog}
+            onOpenChange={setShowCompleteDialog}
+          >
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Завершить бронирование</DialogTitle>
                 <DialogDescription>
-                  Вы уверены, что хотите завершить это бронирование? Убедитесь, что всё оборудование было возвращено.
+                  Вы уверены, что хотите завершить это бронирование? Убедитесь,
+                  что всё оборудование было возвращено.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -603,7 +640,7 @@ export default function BookingDetailPage() {
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'Обработка...' : 'Завершить'}
+                  {actionLoading ? "Обработка..." : "Завершить"}
                 </Button>
               </DialogFooter>
             </DialogContent>

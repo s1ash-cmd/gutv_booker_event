@@ -47,9 +47,9 @@ function decodeJWT(token: string) {
 function mapJwtToUser(payload: Record<string, unknown>): User {
   const role =
     (payload.role as string | undefined) ??
-    (payload[
-      "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-    ] as string | undefined) ??
+    (payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] as
+      | string
+      | undefined) ??
     "User";
 
   const login =
@@ -58,9 +58,9 @@ function mapJwtToUser(payload: Record<string, unknown>): User {
     "";
 
   const name =
-    (payload[
-      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
-    ] as string | undefined) ??
+    (payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as
+      | string
+      | undefined) ??
     (payload.name as string | undefined) ??
     login;
 

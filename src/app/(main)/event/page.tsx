@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { eventApi } from "@/lib/eventApi";
+import { canCreateEvent } from "@/lib/roles";
 
 export default function EventPage() {
   const router = useRouter();
+  const { user, isAuth, isLoading: isAuthLoading } = useAuth();
   const [client, setClient] = useState("");
   const [reason, setReason] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -50,7 +53,7 @@ export default function EventPage() {
       });
 
       setSuccessMessage(
-        `Заявка на event #${event.id} создана. Статус: ${event.status}.`,
+        `Заявка на мероприятие #${event.id} создана. Статус: ${event.status}.`,
       );
       setClient("");
       setReason("");
@@ -61,11 +64,86 @@ export default function EventPage() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Не удалось создать event",
+          : "Не удалось создать мероприятие",
       );
     } finally {
       setLoading(false);
     }
+  }
+
+  if (isAuthLoading) {
+    return (
+      <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="max-w-3xl mx-auto text-center py-12">
+          <div className="inline-flex items-center gap-2 text-muted-foreground">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p>Проверка доступа...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAuth) {
+    return (
+      <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => router.back()} size="icon">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold">
+                Заявка на съемку мероприятия
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Доступно только представителям организаций и администраторам
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
+            <p className="text-muted-foreground">
+              Чтобы создать заявку на event, войдите в аккаунт представителя
+              организации.
+            </p>
+            <Button onClick={() => router.push("/login")}>Войти</Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canCreateEvent(user?.role)) {
+    return (
+      <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => router.back()} size="icon">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold">
+                Заявка на съемку мероприятия
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Доступно только представителям организаций и администраторам
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
+            <p className="text-muted-foreground">
+              Для членов GUtv эта форма недоступна. Для вас доступно
+              бронирование оборудования.
+            </p>
+            <Button onClick={() => router.push("/")}>
+              Перейти к каталогу оборудования
+            </Button>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -76,9 +154,11 @@ export default function EventPage() {
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold">Бронирование event</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold">
+              Заявка на съемку мероприятия
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Доступно всем пользователям, даже без входа в аккаунт
+              Доступно только представителям организаций и администраторам
             </p>
           </div>
         </div>
@@ -116,7 +196,7 @@ export default function EventPage() {
               id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Что это за съемка или event"
+              placeholder="Что это за съемка или мероприятие"
               rows={4}
               disabled={loading}
             />
@@ -160,7 +240,7 @@ export default function EventPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Button type="submit" disabled={loading}>
               <CalendarPlus className="w-4 h-4 mr-2" />
-              {loading ? "Отправка..." : "Забронировать event"}
+              {loading ? "Отправка..." : "Забронировать мероприятие"}
             </Button>
             <Button
               type="button"

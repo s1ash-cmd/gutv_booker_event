@@ -1,12 +1,12 @@
 import "@/app/styles/globals.css";
 
-import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
-import { ClientThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Open_Sans, Roboto } from "next/font/google";
 import type { ReactNode } from "react";
+import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
+import { ClientThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const openSans = Open_Sans({
   subsets: ["latin", "cyrillic"],

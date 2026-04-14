@@ -1,24 +1,27 @@
-import { EquipmentService } from '@/services/equipmentService'
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from "next/server";
+import { EquipmentService } from "@/services/equipmentService";
 
-const equipmentService = new EquipmentService()
+const equipmentService = new EquipmentService();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ modelId: string }> }
+  { params }: { params: Promise<{ modelId: string }> },
 ) {
   try {
-    const { modelId: modelIdParam } = await params
-    const modelId = parseInt(modelIdParam, 10)
+    const { modelId: modelIdParam } = await params;
+    const modelId = parseInt(modelIdParam, 10);
 
-    const items = await equipmentService.getEquipmentItemsByModel(modelId)
-    return NextResponse.json(items)
+    const items = await equipmentService.getEquipmentItemsByModel(modelId);
+    return NextResponse.json(items);
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('не найден') || error.message.includes('Нет экземпляров')) {
-        return NextResponse.json({ error: error.message }, { status: 404 })
+      if (
+        error.message.includes("не найден") ||
+        error.message.includes("Нет экземпляров")
+      ) {
+        return NextResponse.json({ error: error.message }, { status: 404 });
       }
     }
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

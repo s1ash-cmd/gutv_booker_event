@@ -1,4 +1,4 @@
-import { TelegramClient } from '../client';
+import type { TelegramClient } from "../client";
 
 export interface ICommand {
   name: string;

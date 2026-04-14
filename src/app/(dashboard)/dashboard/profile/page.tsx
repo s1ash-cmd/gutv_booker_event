@@ -1,9 +1,18 @@
 "use client";
 
+import {
+  AlertCircle,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Link as LinkIcon,
+  Unlink,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { userApi } from "@/lib/userApi";
-import { UserResponseDto, TelegramLinkCodeResponse } from "@/app/models/user/user";
-import { getAvatarUrl } from "@/lib/avatar";
+import type {
+  TelegramLinkCodeResponse,
+  UserResponseDto,
+} from "@/app/models/user/user";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,15 +23,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertCircle, Link as LinkIcon, Unlink, ExternalLink, Copy, CheckCircle } from "lucide-react";
+import { getAvatarUrl } from "@/lib/avatar";
+import { getRoleLabel, hasRoninAccess, isAdminRole } from "@/lib/roles";
+import { userApi } from "@/lib/userApi";
 import { cn } from "@/lib/utils";
-
-const roleNames: Record<string, string> = {
-  Admin: "Администратор",
-  Ronin: "Ronin",
-  Osnova: "Основа",
-  User: "Пользователь",
-};
 
 export default function Home() {
   const [userData, setUserData] = useState<UserResponseDto | null>(null);
@@ -31,7 +35,8 @@ export default function Home() {
 
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
-  const [telegramCode, setTelegramCode] = useState<TelegramLinkCodeResponse | null>(null);
+  const [telegramCode, setTelegramCode] =
+    useState<TelegramLinkCodeResponse | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -89,7 +94,7 @@ export default function Home() {
 
   const handleOpenTelegram = () => {
     if (telegramCode?.deepLink) {
-      window.open(telegramCode.deepLink, '_blank');
+      window.open(telegramCode.deepLink, "_blank");
     }
   };
 
@@ -110,22 +115,28 @@ export default function Home() {
       <main className="flex items-center justify-center min-h-screen p-6">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
-          <p className="text-muted-foreground">{error || "Пользователь не найден"}</p>
+          <p className="text-muted-foreground">
+            {error || "Пользователь не найден"}
+          </p>
         </div>
       </main>
     );
   }
 
-  const isAdmin = userData.role === "Admin";
-  const hasRoninAccess = userData.role === "Ronin" || userData.role === "Admin";
+  const isAdmin = isAdminRole(userData.role);
+  const canUseRonin = hasRoninAccess(userData.role);
   const hasTelegram = !!userData.telegramUsername;
 
   return (
     <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="overflow-hidden">
-          <h1 className="text-2xl lg:text-3xl font-bold truncate">{userData.name}</h1>
-          <p className="text-sm text-muted-foreground truncate">@{userData.login}</p>
+          <h1 className="text-2xl lg:text-3xl font-bold truncate">
+            {userData.name}
+          </h1>
+          <p className="text-sm text-muted-foreground truncate">
+            @{userData.login}
+          </p>
         </div>
 
         <div className="grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
@@ -134,7 +145,7 @@ export default function Home() {
               <div className="flex justify-center mb-6">
                 <div className="relative">
                   {isAdmin && (
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
+                    <div className="absolute -inset-0.5 bg-linear-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
                   )}
                   <Avatar className="h-24 w-24 relative border-2 border-background">
                     <AvatarImage
@@ -144,7 +155,7 @@ export default function Home() {
                     <AvatarFallback
                       className={cn(
                         "text-2xl font-bold",
-                        isAdmin && "bg-primary text-primary-foreground"
+                        isAdmin && "bg-primary text-primary-foreground",
                       )}
                     >
                       {getInitials(userData.name)}
@@ -155,19 +166,27 @@ export default function Home() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">Ник</span>
-                  <span className="text-base font-semibold text-right break-words">{userData.name}</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Ник
+                  </span>
+                  <span className="text-base font-semibold text-right wrap-break-words">
+                    {userData.name}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">Логин</span>
-                  <span className="text-base font-semibold text-right break-words">
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Логин
+                  </span>
+                  <span className="text-base font-semibold text-right wrap-break-words">
                     {userData.login}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">Telegram</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Telegram
+                  </span>
                   {userData.telegramUsername ? (
                     <a
                       href={`https://t.me/${userData.telegramUsername}`}
@@ -185,21 +204,27 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">Роль</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Роль
+                  </span>
                   <span className="text-base font-semibold text-right">
-                    {roleNames[userData.role] || "Пользователь"}
+                    {getRoleLabel(userData.role)}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-3 gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">Есть Ronin</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Есть разрешение на Ronin
+                  </span>
                   <span
                     className={cn(
                       "text-base font-semibold text-right",
-                      hasRoninAccess ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      canUseRonin
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400",
                     )}
                   >
-                    {hasRoninAccess ? "Да" : "Нет"}
+                    {canUseRonin ? "Да" : "Нет"}
                   </span>
                 </div>
               </div>
@@ -207,13 +232,17 @@ export default function Home() {
 
             <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
               <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                <span className="text-sm text-muted-foreground font-medium">Telegram username</span>
+                <span className="text-sm text-muted-foreground font-medium">
+                  Telegram username
+                </span>
                 <span className="text-sm font-mono text-right break-all">
                   {userData.telegramUsername ?? "Не привязан"}
                 </span>
               </div>
               <div className="flex items-center justify-between py-3 gap-4">
-                <span className="text-sm text-muted-foreground font-medium">Telegram chat id</span>
+                <span className="text-sm text-muted-foreground font-medium">
+                  Telegram chat id
+                </span>
                 <span className="text-sm font-mono text-right break-all">
                   {userData.telegramChatId ?? "—"}
                 </span>
@@ -223,7 +252,9 @@ export default function Home() {
 
           <div className="space-y-6">
             <div className="bg-card border border-border rounded-xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Управление аккаунтом</h2>
+              <h2 className="text-lg font-semibold mb-4">
+                Управление аккаунтом
+              </h2>
               <div className="space-y-3">
                 {hasTelegram ? (
                   <Button
@@ -256,24 +287,6 @@ export default function Home() {
                 )}
               </div>
             </div>
-
-            <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-              <h2 className="text-lg font-semibold mb-4">Статус аккаунта</h2>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Права доступа</p>
-                  <p className="text-sm">
-                    {roleNames[userData.role] || "Пользователь"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Связь с Telegram</p>
-                  <p className="text-sm">
-                    {hasTelegram ? "Подключен" : "Не подключен"}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -290,7 +303,9 @@ export default function Home() {
           {telegramCode && (
             <div className="space-y-4">
               <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-2">Ваш код привязки:</p>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Ваш код привязки:
+                </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-background px-3 py-2 rounded text-lg font-mono font-bold">
                     {telegramCode.code}
@@ -316,7 +331,12 @@ export default function Home() {
                 <p className="text-sm font-medium mb-2">Инструкция:</p>
                 <ol className="text-sm space-y-1 list-decimal list-inside">
                   <li>Откройте бота @{telegramCode.botUsername}</li>
-                  <li>Отправьте команду: <code className="bg-background px-1 py-0.5 rounded">/link {telegramCode.code}</code></li>
+                  <li>
+                    Отправьте команду:{" "}
+                    <code className="bg-background px-1 py-0.5 rounded">
+                      /link {telegramCode.code}
+                    </code>
+                  </li>
                   <li>Или нажмите кнопку ниже для автоматического открытия</li>
                 </ol>
               </div>
@@ -346,8 +366,8 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Отвязать Telegram?</DialogTitle>
             <DialogDescription>
-              Вы уверены, что хотите отвязать свой Telegram аккаунт?
-              Уведомления о бронированиях больше не будут приходить.
+              Вы уверены, что хотите отвязать свой Telegram аккаунт? Уведомления
+              о бронированиях больше не будут приходить.
             </DialogDescription>
           </DialogHeader>
 

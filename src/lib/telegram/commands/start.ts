@@ -1,14 +1,8 @@
-import { UserService } from "@/services/userService";
+import { telegramBackendApi } from "../backendApi";
 import type { TelegramClient } from "../client";
 import type { ICommand } from "./types";
 
 export class StartCommand implements ICommand {
-  private readonly userService: UserService;
-
-  constructor() {
-    this.userService = new UserService();
-  }
-
   public name = "/start";
 
   public async executeAsync(
@@ -29,7 +23,7 @@ export class StartCommand implements ICommand {
         console.log(`Попытка автопривязки. ChatId: ${chatId}, Code: ${code}`);
 
         try {
-          const linkedUser = await this.userService.linkTelegramByCode(
+          const linkedUser = await telegramBackendApi.linkTelegramByCode(
             code,
             chatId,
             username || null,
@@ -86,7 +80,7 @@ export class StartCommand implements ICommand {
       }
     }
 
-    const user = await this.userService.getUserByTelegramChatId(chatId);
+    const user = await telegramBackendApi.getUserByTelegramChatId(chatId);
 
     if (!user) {
       await client.sendMessage({

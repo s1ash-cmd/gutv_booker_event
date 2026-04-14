@@ -1,14 +1,8 @@
-import { UserService } from "@/services/userService";
+import { telegramBackendApi } from "../backendApi";
 import type { TelegramClient } from "../client";
 import type { ICommand } from "./types";
 
 export class BookingCommand implements ICommand {
-  private readonly userService: UserService;
-
-  constructor() {
-    this.userService = new UserService();
-  }
-
   public name = "📆 Мои бронирования";
 
   public async executeAsync(
@@ -16,7 +10,7 @@ export class BookingCommand implements ICommand {
     message: any,
   ): Promise<void> {
     const chatId = BigInt(message.chat.id);
-    const user = await this.userService.getUserByTelegramChatId(chatId);
+    const user = await telegramBackendApi.getUserByTelegramChatId(chatId);
 
     if (!user) {
       await client.sendMessage({

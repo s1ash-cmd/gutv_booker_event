@@ -1,9 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { AppSidebar } from "@/components/layout/AppSidebar";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import type { ReactNode } from "react";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();

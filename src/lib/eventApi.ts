@@ -1,9 +1,9 @@
-import {
+import { BookingStatus } from "@/app/models/booking/booking";
+import type {
   CreateEventRequestDto,
   EventResponseDto,
 } from "@/app/models/event/event";
-import { graphqlNamedEnumLiteral, graphqlRequest } from "./api";
-import { BookingStatus } from "@/app/models/booking/booking";
+import { graphqlNamedEnumLiteral } from "./api";
 import { authenticatedGraphqlRequest } from "./authApi";
 
 type GraphqlEvent = {
@@ -68,7 +68,9 @@ const eventFields = `
 
 export const eventApi = {
   get_all: async () => {
-    const data = await authenticatedGraphqlRequest<{ allEvents: GraphqlEvent[] }>(
+    const data = await authenticatedGraphqlRequest<{
+      allEvents: GraphqlEvent[];
+    }>(
       `
         query AllEvents {
           allEvents {
@@ -96,8 +98,24 @@ export const eventApi = {
     return mapEvent(data.eventById);
   },
 
+  get_my: async () => {
+    const data = await authenticatedGraphqlRequest<{
+      myEvents: GraphqlEvent[];
+    }>(
+      `
+        query MyEvents {
+          myEvents {
+            ${eventFields}
+          }
+        }
+      `,
+    );
+
+    return data.myEvents.map(mapEvent);
+  },
+
   create_event: async (input: CreateEventRequestDto) => {
-    const data = await graphqlRequest<{ createEvent: GraphqlEvent }>(
+    const data = await authenticatedGraphqlRequest<{ createEvent: GraphqlEvent }>(
       `
         mutation CreateEvent($input: CreateEventInput!) {
           createEvent(input: $input) {
@@ -124,7 +142,9 @@ export const eventApi = {
       eventStatusNames[status],
       "Pending",
     );
-    const data = await authenticatedGraphqlRequest<{ eventsByStatus: GraphqlEvent[] }>(
+    const data = await authenticatedGraphqlRequest<{
+      eventsByStatus: GraphqlEvent[];
+    }>(
       `
         query EventsByStatus {
           eventsByStatus(status: ${statusLiteral}) {
@@ -138,7 +158,9 @@ export const eventApi = {
   },
 
   approve: async (id: number, adminComment?: string) => {
-    const data = await authenticatedGraphqlRequest<{ approveEvent: GraphqlEvent }>(
+    const data = await authenticatedGraphqlRequest<{
+      approveEvent: GraphqlEvent;
+    }>(
       `
         mutation ApproveEvent($id: Int!, $adminComment: String) {
           approveEvent(id: $id, adminComment: $adminComment) {
@@ -156,7 +178,9 @@ export const eventApi = {
   },
 
   cancel: async (id: number, adminComment?: string) => {
-    const data = await authenticatedGraphqlRequest<{ cancelEvent: GraphqlEvent }>(
+    const data = await authenticatedGraphqlRequest<{
+      cancelEvent: GraphqlEvent;
+    }>(
       `
         mutation CancelEvent($id: Int!, $adminComment: String) {
           cancelEvent(id: $id, adminComment: $adminComment) {
@@ -174,7 +198,9 @@ export const eventApi = {
   },
 
   complete: async (id: number) => {
-    const data = await authenticatedGraphqlRequest<{ completeEvent: GraphqlEvent }>(
+    const data = await authenticatedGraphqlRequest<{
+      completeEvent: GraphqlEvent;
+    }>(
       `
         mutation CompleteEvent($id: Int!) {
           completeEvent(id: $id) {

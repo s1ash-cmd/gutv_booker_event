@@ -66,9 +66,7 @@ export async function graphqlRequest<TData>(
     headers: {
       "Content-Type": "application/json",
       ...options?.headers,
-      ...(options?.token
-        ? { Authorization: `Bearer ${options.token}` }
-        : {}),
+      ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     body: JSON.stringify({
       query,
@@ -96,8 +94,7 @@ export async function graphqlRequest<TData>(
       payload.errors
         ?.map((error) => error.message)
         .filter(Boolean)
-        .join("\n") ||
-      `Ошибка ${response.status}: ${response.statusText}`;
+        .join("\n") || `Ошибка ${response.status}: ${response.statusText}`;
 
     throw new ApiError(response.status, message, payload.errors);
   }

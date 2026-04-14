@@ -1,29 +1,26 @@
 "use client";
 
 import {
-  AlertCircle,
   Calendar,
-  CalendarPlus,
   ChevronLeft,
   Minus,
   Plus,
-  Send,
   ShoppingCart,
   Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
-import { useEffect } from "react";
+import { canBookEquipment } from "@/lib/roles";
+import { formatBackendErrorDetails } from "@/lib/userFacingMessages";
 
 export default function CartPage() {
   const {
-    cart,
     removeFromCart,
     updateQuantity,
     clearCart,
@@ -34,7 +31,7 @@ export default function CartPage() {
     getTotalItems,
     getCartItems,
   } = useCart();
-  const { isAuth } = useAuth();
+  const { user, isAuth } = useAuth();
   const router = useRouter();
 
   const [reason, setReason] = useState("");
@@ -43,12 +40,15 @@ export default function CartPage() {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const canUseBooking = canBookEquipment(user?.role);
 
   const cartItems = getCartItems();
 
   useEffect(() => {
     setReason(cartDetails.reason ?? "");
-    setStartTime(cartDetails.startTime ? cartDetails.startTime.slice(0, 16) : "");
+    setStartTime(
+      cartDetails.startTime ? cartDetails.startTime.slice(0, 16) : "",
+    );
     setEndTime(cartDetails.endTime ? cartDetails.endTime.slice(0, 16) : "");
     setComment(cartDetails.comment ?? "");
   }, [cartDetails]);
@@ -143,14 +143,11 @@ export default function CartPage() {
           errorMessage;
       }
 
-      if (err.errors) {
-        const validationErrors = Object.entries(err.errors)
-          .map(
-            ([field, messages]) =>
-              `${field}: ${Array.isArray(messages) ? messages.join(", ") : messages}`,
-          )
-          .join("\n");
-        errorMessage = validationErrors || errorMessage;
+      const validationErrors = formatBackendErrorDetails(
+        err.errors ?? err.response?.data?.errors,
+      );
+      if (validationErrors) {
+        errorMessage = validationErrors;
       }
 
       setErrors({ form: errorMessage });
@@ -171,15 +168,36 @@ export default function CartPage() {
               Корзина доступна после входа
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Для бронирования оборудования войдите в аккаунт. Event можно забронировать без входа.
+              Для бронирования оборудования войдите в аккаунт. Мероприятия
+              доступны через верхнее меню.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Button onClick={() => router.push("/login")}>Войти</Button>
-              <Button variant="outline" onClick={() => router.push("/event")}>
-                <CalendarPlus className="w-4 h-4 mr-2" />
-                Забронировать event
-              </Button>
             </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canUseBooking) {
+    return (
+      <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center py-12 bg-card/30 border border-border/50 rounded-xl">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Бронирование оборудования недоступно
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Представители организаций могут создавать только заявки на
+              мероприятия.
+            </p>
+            <Button onClick={() => router.push("/event")}>
+              Перейти к заявке на event
+            </Button>
           </div>
         </div>
       </main>
@@ -223,10 +241,8 @@ export default function CartPage() {
               Добавьте оборудование для бронирования
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
-              <Button onClick={() => router.push("/")}>Перейти к каталогу</Button>
-              <Button variant="outline" onClick={() => router.push("/event")}>
-                <CalendarPlus className="w-4 h-4 mr-2" />
-                Бронь event
+              <Button onClick={() => router.push("/")}>
+                Перейти к каталогу
               </Button>
             </div>
           </div>

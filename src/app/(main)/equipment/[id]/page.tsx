@@ -1,7 +1,5 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
-import { useCart } from "@/contexts/CartContext";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
@@ -15,20 +13,17 @@ import {
   Plus,
   Shield,
   ShoppingCart,
-  X
+  X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { DateRange } from "react-day-picker";
-
+import type { DateRange } from "react-day-picker";
 import {
-  EqItemResponseDto,
-  EqModelResponseDto,
+  type EqItemResponseDto,
+  type EqModelResponseDto,
   EquipmentAccess,
-  EquipmentCategory
+  EquipmentCategory,
 } from "@/app/models/equipment/equipment";
-import { equipmentApi } from "@/lib/equipmentApi";
-
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -42,6 +37,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { equipmentApi } from "@/lib/equipmentApi";
+import { canBookEquipment } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const categoryNames: Record<EquipmentCategory, string> = {
@@ -69,6 +68,7 @@ export default function EquipmentDetailPage() {
   const { user } = useAuth();
   const { cart, addToCart, removeFromCart } = useCart();
   const isAdmin = user?.role === "Admin";
+  const canUseBooking = canBookEquipment(user?.role);
 
   const [model, setModel] = useState<EqModelResponseDto | null>(null);
   const [items, setItems] = useState<EqItemResponseDto[]>([]);
@@ -82,7 +82,9 @@ export default function EquipmentDetailPage() {
 
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
-  const [rangeAvailableItems, setRangeAvailableItems] = useState<EqItemResponseDto[] | null>(null);
+  const [rangeAvailableItems, setRangeAvailableItems] = useState<
+    EqItemResponseDto[] | null
+  >(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [togglingItemId, setTogglingItemId] = useState<number | null>(null);
@@ -99,7 +101,7 @@ export default function EquipmentDetailPage() {
         try {
           itemsData = await equipmentApi.get_items_by_model(id);
         } catch (err) {
-          console.log('Экземпляры не найдены:', err);
+          console.log("Экземпляры не найдены:", err);
         }
 
         setModel(modelData);
@@ -118,13 +120,19 @@ export default function EquipmentDetailPage() {
   const isRangeMode = rangeAvailableItems !== null;
 
   const itemsToRender = useMemo(() => {
-    return isRangeMode ? rangeAvailableItems ?? [] : items;
+    return isRangeMode ? (rangeAvailableItems ?? []) : items;
   }, [isRangeMode, rangeAvailableItems, items]);
 
-  const availableNowCount = useMemo(() => items.filter((i) => i.available).length, [items]);
-  const availableInRangeCount = useMemo(() => rangeAvailableItems?.length ?? 0, [rangeAvailableItems]);
+  const availableNowCount = useMemo(
+    () => items.filter((i) => i.available).length,
+    [items],
+  );
+  const availableInRangeCount = useMemo(
+    () => rangeAvailableItems?.length ?? 0,
+    [rangeAvailableItems],
+  );
 
-  const cartQuantity = model ? (cart[model.id]?.quantity || 0) : 0;
+  const cartQuantity = model ? cart[model.id]?.quantity || 0 : 0;
 
   const handleAddToCart = async () => {
     if (!model) {
@@ -133,6 +141,11 @@ export default function EquipmentDetailPage() {
 
     if (!user) {
       router.push("/login");
+      return;
+    }
+
+    if (!canUseBooking) {
+      alert("Представителям организаций недоступно бронирование оборудования");
       return;
     }
 
@@ -167,8 +180,8 @@ export default function EquipmentDetailPage() {
       const itemsData = await equipmentApi.get_items_by_model(model.id);
       setItems(itemsData);
     } catch (err) {
-      console.error('Ошибка создания экземпляра:', err);
-      alert('Не удалось создать экземпляр');
+      console.error("Ошибка создания экземпляра:", err);
+      alert("Не удалось создать экземпляр");
     } finally {
       setCreatingItem(false);
     }
@@ -181,10 +194,16 @@ export default function EquipmentDetailPage() {
     }
 
     const start = new Date(date.from);
-    start.setHours(parseInt(startTime.split(':')[0]), parseInt(startTime.split(':')[1]));
+    start.setHours(
+      parseInt(startTime.split(":")[0]),
+      parseInt(startTime.split(":")[1]),
+    );
 
     const end = new Date(date.to);
-    end.setHours(parseInt(endTime.split(':')[0]), parseInt(endTime.split(':')[1]));
+    end.setHours(
+      parseInt(endTime.split(":")[0]),
+      parseInt(endTime.split(":")[1]),
+    );
 
     if (start >= end) {
       setRangeError("Дата начала должна быть раньше даты окончания");
@@ -198,7 +217,7 @@ export default function EquipmentDetailPage() {
       const available = await equipmentApi.get_available_items_by_model(
         model.id,
         start.toISOString(),
-        end.toISOString()
+        end.toISOString(),
       );
 
       setRangeAvailableItems(available);
@@ -224,21 +243,20 @@ export default function EquipmentDetailPage() {
       setTogglingItemId(itemId);
       await equipmentApi.toggle_item_available(itemId);
 
-      setItems(prevItems =>
-        prevItems.map(item =>
-          item.id === itemId
-            ? { ...item, available: !item.available }
-            : item
-        )
+      setItems((prevItems) =>
+        prevItems.map((item) =>
+          item.id === itemId ? { ...item, available: !item.available } : item,
+        ),
       );
 
       if (rangeAvailableItems) {
-        setRangeAvailableItems(prevItems =>
-          prevItems?.map(item =>
-            item.id === itemId
-              ? { ...item, available: !item.available }
-              : item
-          ) ?? null
+        setRangeAvailableItems(
+          (prevItems) =>
+            prevItems?.map((item) =>
+              item.id === itemId
+                ? { ...item, available: !item.available }
+                : item,
+            ) ?? null,
         );
       }
     } catch (error) {
@@ -268,7 +286,9 @@ export default function EquipmentDetailPage() {
     return (
       <main className="min-h-screen bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="max-w-7xl mx-auto">
-          <p className="text-center text-destructive">{error || "Оборудование не найдено"}</p>
+          <p className="text-center text-destructive">
+            {error || "Оборудование не найдено"}
+          </p>
           <div className="flex justify-center mt-4">
             <Button onClick={() => router.push("/")} variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -283,7 +303,11 @@ export default function EquipmentDetailPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
       <div className="max-w-7xl mx-auto">
-        <Button variant="ghost" onClick={() => router.push("/")} className="mb-6">
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/")}
+          className="mb-6"
+        >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Назад к списку
         </Button>
@@ -294,9 +318,13 @@ export default function EquipmentDetailPage() {
               <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-2.5 py-1 rounded-md text-xs font-semibold mb-3">
                 {categoryNames[model.category]}
               </span>
-              <h1 className="text-3xl font-bold text-foreground">{model.name}</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                {model.name}
+              </h1>
               {model.description && (
-                <p className="text-muted-foreground mt-3">{model.description}</p>
+                <p className="text-muted-foreground mt-3">
+                  {model.description}
+                </p>
               )}
             </div>
 
@@ -323,8 +351,12 @@ export default function EquipmentDetailPage() {
                     <CalendarIcon className="w-5 h-5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <div className="text-xs text-muted-foreground font-medium">Выбранный период</div>
-                    <div className="text-sm font-semibold">{formatDateRange()}</div>
+                    <div className="text-xs text-muted-foreground font-medium">
+                      Выбранный период
+                    </div>
+                    <div className="text-sm font-semibold">
+                      {formatDateRange()}
+                    </div>
                   </div>
                 </div>
                 {(date || isRangeMode) && (
@@ -352,7 +384,8 @@ export default function EquipmentDetailPage() {
               {isRangeMode && (
                 <div className="mt-4 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
                   <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                    Найдено {availableInRangeCount} свободных экземпляров в выбранный период
+                    Найдено {availableInRangeCount} свободных экземпляров в
+                    выбранный период
                   </p>
                 </div>
               )}
@@ -360,7 +393,9 @@ export default function EquipmentDetailPage() {
 
             {Object.keys(model.attributes).length > 0 && (
               <div className="bg-card border border-border rounded-xl p-6">
-                <h2 className="text-lg font-semibold mb-4">Технические характеристики</h2>
+                <h2 className="text-lg font-semibold mb-4">
+                  Технические характеристики
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {Object.entries(model.attributes).map(([key, value]) => (
                     <div key={key} className="border-l-2 border-primary pl-3">
@@ -385,7 +420,9 @@ export default function EquipmentDetailPage() {
                 <div className="space-y-2">
                   {itemsToRender.length === 0 ? (
                     <div className="text-center py-12 text-sm text-muted-foreground">
-                      {isRangeMode ? "Нет доступных экземпляров в выбранный период" : "Нет экземпляров"}
+                      {isRangeMode
+                        ? "Нет доступных экземпляров в выбранный период"
+                        : "Нет экземпляров"}
                     </div>
                   ) : (
                     itemsToRender.map((item) => {
@@ -399,14 +436,14 @@ export default function EquipmentDetailPage() {
                             "flex items-center justify-between p-3 rounded-lg border transition-colors",
                             isAvailable
                               ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-                              : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                              : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
                           )}
                         >
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
                                 "w-2 h-2 rounded-full",
-                                isAvailable ? "bg-green-500" : "bg-red-500"
+                                isAvailable ? "bg-green-500" : "bg-red-500",
                               )}
                             />
                             <Hash className="w-4 h-4 text-muted-foreground" />
@@ -421,7 +458,7 @@ export default function EquipmentDetailPage() {
                                 "text-xs font-semibold px-2.5 py-1 rounded-full",
                                 isAvailable
                                   ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                                  : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                                  : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
                               )}
                             >
                               {isAvailable ? "Доступен" : "Недоступен"}
@@ -431,15 +468,21 @@ export default function EquipmentDetailPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleToggleAvailability(item.id)}
+                                onClick={() =>
+                                  handleToggleAvailability(item.id)
+                                }
                                 disabled={isToggling}
                                 className={cn(
                                   "h-8 w-8 p-0 transition-colors",
                                   isAvailable
                                     ? "text-red-600 hover:text-red-700 hover:bg-green-100 dark:hover:bg-red-900/30"
-                                    : "text-green-600 hover:text-green-700 hover:bg-red-100 dark:hover:bg-green-900/30"
+                                    : "text-green-600 hover:text-green-700 hover:bg-red-100 dark:hover:bg-green-900/30",
                                 )}
-                                title={isAvailable ? "Сделать недоступным" : "Сделать доступным"}
+                                title={
+                                  isAvailable
+                                    ? "Сделать недоступным"
+                                    : "Сделать доступным"
+                                }
                               >
                                 {isToggling ? (
                                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -466,18 +509,25 @@ export default function EquipmentDetailPage() {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Всего единиц</span>
+                    <span className="text-sm text-muted-foreground">
+                      Всего единиц
+                    </span>
                     <span className="text-2xl font-bold">{items.length}</span>
                   </div>
                   <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "100%" }} />
+                    <div
+                      className="h-full bg-primary"
+                      style={{ width: "100%" }}
+                    />
                   </div>
                 </div>
 
                 {!isRangeMode ? (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Доступно сейчас</span>
+                      <span className="text-sm text-muted-foreground">
+                        Доступно сейчас
+                      </span>
                       <span className="text-2xl font-bold text-green-600 dark:text-green-400">
                         {availableNowCount}
                       </span>
@@ -494,7 +544,9 @@ export default function EquipmentDetailPage() {
                 ) : (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Свободно в период</span>
+                      <span className="text-sm text-muted-foreground">
+                        Свободно в период
+                      </span>
                       <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                         {availableInRangeCount}
                       </span>
@@ -522,15 +574,20 @@ export default function EquipmentDetailPage() {
                       ? "text-green-500"
                       : model.access === EquipmentAccess.Osnova
                         ? "text-yellow-500"
-                        : "text-red-500"
+                        : "text-red-500",
                   )}
                 />
                 <div>
-                  <div className="text-sm font-semibold">{accessNames[model.access]}</div>
+                  <div className="text-sm font-semibold">
+                    {accessNames[model.access]}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {model.access === EquipmentAccess.User && "Доступно всем пользователям"}
-                    {model.access === EquipmentAccess.Osnova && "Доступно только основе"}
-                    {model.access === EquipmentAccess.Ronin && "Требуется сдать экзамен"}
+                    {model.access === EquipmentAccess.User &&
+                      "Доступно всем пользователям"}
+                    {model.access === EquipmentAccess.Osnova &&
+                      "Доступно только основе"}
+                    {model.access === EquipmentAccess.Ronin &&
+                      "Требуется сдать экзамен"}
                   </div>
                 </div>
               </div>
@@ -564,8 +621,7 @@ export default function EquipmentDetailPage() {
                 size="lg"
                 onClick={() => void handleAddToCart()}
               >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                В бронирование
+                <ShoppingCart className="w-4 h-4 mr-2" />В бронирование
               </Button>
             ) : (
               <div className="flex items-center justify-between bg-primary/10 rounded-lg p-2">
@@ -577,9 +633,7 @@ export default function EquipmentDetailPage() {
                 >
                   <Minus className="w-5 h-5" />
                 </Button>
-                <span className="font-bold text-xl px-4">
-                  {cartQuantity}
-                </span>
+                <span className="font-bold text-xl px-4">{cartQuantity}</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -613,17 +667,20 @@ export default function EquipmentDetailPage() {
                 locale={ru}
                 className="rounded-lg border p-2"
                 classNames={{
-                  months: "flex flex-col sm:flex-row space-y-4 sm:space-x-2 sm:space-y-0",
+                  months:
+                    "flex flex-col sm:flex-row space-y-4 sm:space-x-2 sm:space-y-0",
                   month: "space-y-2",
                   caption: "flex justify-center pt-1 relative items-center",
                   caption_label: "text-xs sm:text-sm font-medium",
                   nav: "space-x-1 flex items-center",
-                  nav_button: "h-6 w-6 sm:h-7 sm:w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+                  nav_button:
+                    "h-6 w-6 sm:h-7 sm:w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
                   nav_button_previous: "absolute left-0 sm:left-1",
                   nav_button_next: "absolute right-0 sm:right-1",
                   table: "w-full border-collapse",
                   head_row: "flex",
-                  head_cell: "text-muted-foreground rounded-md w-7 sm:w-9 font-normal text-[10px] sm:text-xs",
+                  head_cell:
+                    "text-muted-foreground rounded-md w-7 sm:w-9 font-normal text-[10px] sm:text-xs",
                   row: "flex w-full mt-0.5 sm:mt-1",
                   cell: "h-7 w-7 sm:h-9 sm:w-9 text-center text-xs sm:text-sm p-0 relative",
                   day: "h-7 w-7 sm:h-9 sm:w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors",
@@ -632,7 +689,8 @@ export default function EquipmentDetailPage() {
                   day_today: "bg-accent text-accent-foreground font-semibold",
                   day_outside: "text-muted-foreground opacity-50",
                   day_disabled: "text-muted-foreground opacity-50",
-                  day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                  day_range_middle:
+                    "aria-selected:bg-accent aria-selected:text-accent-foreground",
                   day_hidden: "invisible",
                 }}
               />
@@ -669,8 +727,9 @@ export default function EquipmentDetailPage() {
             {date?.from && date?.to && (
               <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 sm:p-3 mx-2 sm:mx-4">
                 <p className="text-xs sm:text-sm font-medium text-center wrap-break-word">
-                  {format(date.from, "d MMMM yyyy", { locale: ru })} в {startTime} →{" "}
-                  {format(date.to, "d MMMM yyyy", { locale: ru })} в {endTime}
+                  {format(date.from, "d MMMM yyyy", { locale: ru })} в{" "}
+                  {startTime} → {format(date.to, "d MMMM yyyy", { locale: ru })}{" "}
+                  в {endTime}
                 </p>
               </div>
             )}

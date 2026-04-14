@@ -1,6 +1,6 @@
-import { prisma } from '@/lib/prisma';
-import { TelegramClient } from './client';
-import { BookingStatus } from '@/app/models/booking/booking';
+import { BookingStatus } from "@/app/models/booking/booking";
+import { prisma } from "@/lib/prisma";
+import { TelegramClient } from "./client";
 
 export class TelegramNotificationService {
   private client: TelegramClient;
@@ -36,15 +36,13 @@ export class TelegramNotificationService {
 
       let warnings: Record<string, any> = {};
       try {
-        warnings = booking.warningsJson
-          ? JSON.parse(booking.warningsJson)
-          : {};
+        warnings = booking.warningsJson ? JSON.parse(booking.warningsJson) : {};
       } catch (e) {
-        console.error('Ошибка парсинга warningsJson:', e);
+        console.error("Ошибка парсинга warningsJson:", e);
       }
 
       let message = `🆕 <b>Новое бронирование #${booking.id}</b>\n\n`;
-      message += `👤 <b>Пользователь:</b> ${booking.user.name} (@${booking.user.telegramUsername || '-'})\n`;
+      message += `👤 <b>Пользователь:</b> ${booking.user.name} (@${booking.user.telegramUsername || "-"})\n`;
       message += `📝 <b>Причина:</b> ${booking.reason}\n`;
       message += `📅 <b>Период:</b> ${this.formatDate(booking.startTime)} - ${this.formatDate(booking.endTime)}\n\n`;
       message += `📦 <b>Оборудование:</b>\n`;
@@ -59,7 +57,7 @@ export class TelegramNotificationService {
 
       const warningMessages = this.formatWarnings(warnings);
       if (warningMessages.length > 0) {
-        message += `\n\n⚠️ <b>Предупреждения:</b>\n${warningMessages.join('\n')}`;
+        message += `\n\n⚠️ <b>Предупреждения:</b>\n${warningMessages.join("\n")}`;
       }
 
       message += `\n\n⏳ <b>Статус:</b> Ожидает подтверждения`;
@@ -67,8 +65,14 @@ export class TelegramNotificationService {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: '✅ Подтвердить', callback_data: `booking:approve:${booking.id}` },
-            { text: '❌ Отклонить', callback_data: `booking:reject:${booking.id}` },
+            {
+              text: "✅ Подтвердить",
+              callback_data: `booking:approve:${booking.id}`,
+            },
+            {
+              text: "❌ Отклонить",
+              callback_data: `booking:reject:${booking.id}`,
+            },
           ],
         ],
       };
@@ -77,19 +81,22 @@ export class TelegramNotificationService {
         await this.client.sendMessage({
           chat_id: Number(admin.telegramChatId!),
           text: message,
-          parse_mode: 'HTML',
+          parse_mode: "HTML",
           reply_markup: keyboard,
         });
       }
     } catch (error) {
-      console.error(`Ошибка отправки уведомлений о бронировании #${bookingId}:`, error);
+      console.error(
+        `Ошибка отправки уведомлений о бронировании #${bookingId}:`,
+        error,
+      );
     }
   }
 
   async notifyUserBookingStatusChanged(
     bookingId: number,
     oldStatus: BookingStatus,
-    newStatus: BookingStatus
+    newStatus: BookingStatus,
   ) {
     try {
       const booking = await prisma.booking.findUnique({
@@ -130,10 +137,13 @@ export class TelegramNotificationService {
       await this.client.sendMessage({
         chat_id: Number(booking.user.telegramChatId),
         text: message,
-        parse_mode: 'HTML',
+        parse_mode: "HTML",
       });
     } catch (error) {
-      console.error(`Ошибка отправки уведомления о смене статуса #${bookingId}:`, error);
+      console.error(
+        `Ошибка отправки уведомления о смене статуса #${bookingId}:`,
+        error,
+      );
     }
   }
 
@@ -142,10 +152,10 @@ export class TelegramNotificationService {
 
     for (const [key, value] of Object.entries(warnings)) {
       if (Array.isArray(value) && value.length > 0) {
-        messages.push(`   • <b>${key}:</b> ${value.join(', ')}`);
-      } else if (typeof value === 'string') {
+        messages.push(`   • <b>${key}:</b> ${value.join(", ")}`);
+      } else if (typeof value === "string") {
         messages.push(`   • <b>${key}:</b> ${value}`);
-      } else if (value && typeof value === 'object') {
+      } else if (value && typeof value === "object") {
         messages.push(`   • <b>${key}:</b> ${JSON.stringify(value)}`);
       }
     }
@@ -155,30 +165,39 @@ export class TelegramNotificationService {
 
   private getStatusEmoji(status: BookingStatus): string {
     switch (status) {
-      case BookingStatus.Approved: return '✅';
-      case BookingStatus.Completed: return '🏁';
-      case BookingStatus.Cancelled: return '❌';
-      default: return '⏳';
+      case BookingStatus.Approved:
+        return "✅";
+      case BookingStatus.Completed:
+        return "🏁";
+      case BookingStatus.Cancelled:
+        return "❌";
+      default:
+        return "⏳";
     }
   }
 
   private getStatusText(status: BookingStatus): string {
     switch (status) {
-      case BookingStatus.Pending: return 'Ожидает';
-      case BookingStatus.Approved: return 'Одобрено';
-      case BookingStatus.Completed: return 'Завершено';
-      case BookingStatus.Cancelled: return 'Отменено';
-      default: return 'Неизвестно';
+      case BookingStatus.Pending:
+        return "Ожидает";
+      case BookingStatus.Approved:
+        return "Одобрено";
+      case BookingStatus.Completed:
+        return "Завершено";
+      case BookingStatus.Cancelled:
+        return "Отменено";
+      default:
+        return "Неизвестно";
     }
   }
 
   private formatDate(date: Date): string {
-    return new Intl.DateTimeFormat('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(new Date(date));
   }
 }

@@ -5,6 +5,5 @@ export default function RegisterPage() {
     <main>
       <RegisterForm />
     </main>
-
   );
 }

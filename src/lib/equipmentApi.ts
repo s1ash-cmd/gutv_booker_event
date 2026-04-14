@@ -1,10 +1,10 @@
 import {
-  CreateEqModelRequestDto,
+  type CreateEqModelRequestDto,
+  type EqItemResponseDto,
+  type EqModelResponseDto,
+  type EqModelWithItemsDto,
   EquipmentAccess,
   EquipmentCategory,
-  EqItemResponseDto,
-  EqModelResponseDto,
-  EqModelWithItemsDto,
 } from "@/app/models/equipment/equipment";
 import { graphqlNamedEnumLiteral, graphqlRequest } from "./api";
 import { authenticatedGraphqlRequest } from "./authApi";
@@ -116,10 +116,11 @@ function buildEquipmentInputLiteral(data: CreateEqModelRequestDto) {
     "Other",
   );
   const attributesJson = JSON.stringify(data.attributes ?? {});
+  const description = data.description?.trim() ?? "";
 
   return `{
     name: ${escapeGraphqlString(data.name)}
-    description: ${escapeGraphqlString(data.description)}
+    description: ${escapeGraphqlString(description)}
     category: ${categoryLiteral}
     osnova: ${data.osnova ? "true" : "false"}
     attributesJson: ${escapeGraphqlString(attributesJson)}

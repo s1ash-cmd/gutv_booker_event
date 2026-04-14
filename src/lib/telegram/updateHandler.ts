@@ -1,6 +1,5 @@
-import { BookingStatus } from "@/app/models/booking/booking";
-import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import { type TelegramBookingDto, telegramBackendApi } from "./backendApi";
 import { TelegramClient } from "./client";
 import { BackCommand } from "./commands/back";
 import { BookingFilterCommand } from "./commands/bookingFilter";
@@ -10,7 +9,6 @@ import { LinkCommand } from "./commands/link";
 import { ProfileCommand } from "./commands/profile";
 import { StartCommand } from "./commands/start";
 import type { ICommand } from "./commands/types";
-import { TelegramNotificationService } from "./notificationService";
 
 export class TelegramUpdateHandler {
   private client: TelegramClient;
@@ -107,27 +105,11 @@ export class TelegramUpdateHandler {
         const [_, action, bookingIdStr] = parts;
         const bookingId = parseInt(bookingIdStr);
 
-        const admin = await prisma.user.findFirst({
-          where: { telegramChatId: BigInt(chatId) },
-        });
-
-        if (!admin || admin.role !== 3) {
+        const admin = await telegramBackendApi.getUserByTelegramChatId(chatId);
+        if (!admin || admin.role !== "Admin") {
           await this.client.answerCallbackQuery({
             callback_query_id: callbackQuery.id,
             text: "❌ У вас нет прав для этого действия",
-            show_alert: true,
-          });
-          return;
-        }
-
-        const booking = await prisma.booking.findUnique({
-          where: { id: bookingId },
-        });
-
-        if (!booking || booking.status !== BookingStatus.Pending) {
-          await this.client.answerCallbackQuery({
-            callback_query_id: callbackQuery.id,
-            text: "❌ Бронирование недоступно для обработки",
             show_alert: true,
           });
           return;
@@ -166,72 +148,112 @@ export class TelegramUpdateHandler {
     const { action, bookingId } = pendingData;
 
     try {
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-      });
-
-      if (!booking || booking.status !== BookingStatus.Pending) {
-        await this.client.sendMessage({
-          chat_id: chatId,
-          text: "❌ Это бронирование уже обработано",
-        });
-        return;
-      }
-
       const comment = text === "-" ? null : text;
-      const notificationService = new TelegramNotificationService();
+      const booking =
+        action === "approve"
+          ? await telegramBackendApi.approveBookingByTelegram(
+              chatId,
+              bookingId,
+              comment,
+            )
+          : await telegramBackendApi.rejectBookingByTelegram(
+              chatId,
+              bookingId,
+              comment,
+            );
 
       if (action === "approve") {
-        await prisma.booking.update({
-          where: { id: bookingId },
-          data: { status: BookingStatus.Approved, adminComment: comment },
-        });
-
         await this.client.sendMessage({
           chat_id: chatId,
           text: `✅ Бронирование #${bookingId} одобрено`,
         });
-        await notificationService.notifyUserBookingStatusChanged(
-          bookingId,
-          BookingStatus.Pending,
-          BookingStatus.Approved,
-        );
       } else if (action === "reject") {
-        await prisma.booking.update({
-          where: { id: bookingId },
-          data: { status: BookingStatus.Cancelled, adminComment: comment },
-        });
-
         await this.client.sendMessage({
           chat_id: chatId,
           text: `❌ Бронирование #${bookingId} отклонено`,
         });
-        await notificationService.notifyUserBookingStatusChanged(
-          bookingId,
-          BookingStatus.Pending,
-          BookingStatus.Cancelled,
-        );
       }
-    } catch (error) {
+
+      await this.notifyBookingStatusChanged(booking);
+    } catch (error: any) {
       console.error("Ошибка обработки комментария:", error);
       await this.client.sendMessage({
         chat_id: chatId,
-        text: "❌ Произошла ошибка",
+        text: `❌ ${error.message || "Произошла ошибка"}`,
       });
     }
   }
 
+  private async notifyBookingStatusChanged(booking: TelegramBookingDto) {
+    if (!booking.userTelegramChatId) {
+      return;
+    }
+
+    let message = `${this.getStatusEmoji(booking.status)} <b>Изменение статуса бронирования #${booking.id}</b>\n\n`;
+    message += `<b>Новый статус:</b> <b>${this.getStatusText(booking.status)}</b>\n\n`;
+    message += `📝 <b>Причина:</b> ${booking.reason}\n`;
+    message += `📅 <b>Период:</b> ${this.formatDate(booking.startTime)} - ${this.formatDate(booking.endTime)}\n\n`;
+    message += `📦 <b>Оборудование:</b>\n`;
+
+    for (const item of booking.equipmentModelIds) {
+      message += `   • ${item.modelName} (${item.inventoryNumber})\n`;
+    }
+
+    if (booking.adminComment) {
+      message += `\n💬 <b>Комментарий администратора:</b> ${booking.adminComment}`;
+    }
+
+    await this.client.sendMessage({
+      chat_id: Number(booking.userTelegramChatId),
+      text: message,
+      parse_mode: "HTML",
+    });
+  }
+
+  private getStatusEmoji(status: string) {
+    switch (status) {
+      case "Approved":
+        return "✅";
+      case "Completed":
+        return "🏁";
+      case "Cancelled":
+        return "❌";
+      default:
+        return "⏳";
+    }
+  }
+
+  private getStatusText(status: string) {
+    switch (status) {
+      case "Pending":
+        return "Ожидает";
+      case "Approved":
+        return "Одобрено";
+      case "Completed":
+        return "Завершено";
+      case "Cancelled":
+        return "Отменено";
+      default:
+        return status;
+    }
+  }
+
+  private formatDate(date: string) {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(date));
+  }
+
   private async updateUsername(chatId: number, username: string) {
     try {
-      const user = await prisma.user.findFirst({
-        where: { telegramChatId: BigInt(chatId) },
-      });
-      if (user && user.telegramUsername !== username) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { telegramUsername: username === "Unknown" ? null : username },
-        });
-      }
+      await telegramBackendApi.updateTelegramUsername(
+        chatId,
+        username === "Unknown" ? null : username,
+      );
     } catch (error) {
       console.warn(`Не удалось обновить username для ChatId: ${chatId}`, error);
     }

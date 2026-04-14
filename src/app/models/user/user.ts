@@ -2,15 +2,16 @@ export enum UserRole {
   User = 0,
   Osnova = 1,
   Ronin = 2,
-  Admin = 3
+  Admin = 3,
+  Organization = 4,
 }
 
 export interface CreateUserRequestDto {
   login: string;
   password: string;
   name: string;
-  joinYear: number;
-  ronin: boolean;
+  joinYear: number | null;
+  isOrganization: boolean;
 }
 
 export interface UserResponseDto {

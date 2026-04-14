@@ -1,46 +1,59 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, Filter, X, AlertCircle, Plus, Minus, ShoppingCart, CalendarPlus } from 'lucide-react';
-import { equipmentApi } from '@/lib/equipmentApi';
-import { EqModelResponseDto, EquipmentCategory, EquipmentAccess } from '@/app/models/equipment/equipment';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  AlertCircle,
+  Filter,
+  Minus,
+  Plus,
+  Search,
+  ShoppingCart,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import {
+  type EqModelResponseDto,
+  EquipmentAccess,
+  EquipmentCategory,
+} from "@/app/models/equipment/equipment";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCart } from '@/contexts/CartContext';
+} from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { equipmentApi } from "@/lib/equipmentApi";
+import { canBookEquipment } from "@/lib/roles";
 
 const categoryNames: Record<EquipmentCategory, string> = {
-  [EquipmentCategory.Camera]: 'Камера',
-  [EquipmentCategory.Lens]: 'Объектив',
-  [EquipmentCategory.Card]: 'Карта памяти',
-  [EquipmentCategory.Battery]: 'Аккумулятор',
-  [EquipmentCategory.Charger]: 'Зарядное устройство',
-  [EquipmentCategory.Sound]: 'Звук',
-  [EquipmentCategory.Stand]: 'Штатив',
-  [EquipmentCategory.Light]: 'Свет',
-  [EquipmentCategory.Other]: 'Прочее',
+  [EquipmentCategory.Camera]: "Камера",
+  [EquipmentCategory.Lens]: "Объектив",
+  [EquipmentCategory.Card]: "Карта памяти",
+  [EquipmentCategory.Battery]: "Аккумулятор",
+  [EquipmentCategory.Charger]: "Зарядное устройство",
+  [EquipmentCategory.Sound]: "Звук",
+  [EquipmentCategory.Stand]: "Штатив",
+  [EquipmentCategory.Light]: "Свет",
+  [EquipmentCategory.Other]: "Прочее",
 };
 
 const accessNames: Record<EquipmentAccess, string> = {
-  [EquipmentAccess.User]: 'Все пользователи',
-  [EquipmentAccess.Osnova]: 'Основа',
-  [EquipmentAccess.Ronin]: 'Требуется разрешение',
+  [EquipmentAccess.User]: "Все пользователи",
+  [EquipmentAccess.Osnova]: "Основа",
+  [EquipmentAccess.Ronin]: "Требуется разрешение",
 };
 
 function isNotFoundError(error: any): boolean {
   return (
-    error?.message?.includes('не найдено') ||
-    error?.message?.includes('не найден') ||
+    error?.message?.includes("не найдено") ||
+    error?.message?.includes("не найден") ||
     error?.status === 404 ||
-    error?.message?.toLowerCase().includes('not found')
+    error?.message?.toLowerCase().includes("not found")
   );
 }
 
@@ -48,26 +61,27 @@ export default function HomePage() {
   const [models, setModels] = useState<EqModelResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const didInitAvailabilityFilterRef = useRef(false);
   const hadSearchQueryRef = useRef(false);
   const router = useRouter();
-  const { isAuth, isLoading: isAuthLoading } = useAuth();
+  const { user, isAuth, isLoading: isAuthLoading } = useAuth();
   const { cart, addToCart, removeFromCart, getTotalItems } = useCart();
+  const canUseBooking = canBookEquipment(user?.role);
 
   useEffect(() => {
     if (isAuthLoading || didInitAvailabilityFilterRef.current) {
       return;
     }
 
-    if (isAuth) {
+    if (isAuth && canUseBooking) {
       setOnlyAvailable(true);
     }
 
     didInitAvailabilityFilterRef.current = true;
-  }, [isAuthLoading, isAuth]);
+  }, [isAuthLoading, isAuth, canUseBooking]);
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -108,13 +122,17 @@ export default function HomePage() {
       let data: EqModelResponseDto[] = [];
 
       try {
-        if (onlyAvailable && isAuth && selectedCategory !== 'all') {
+        if (onlyAvailable && isAuth && canUseBooking && selectedCategory !== "all") {
           const availableData = await equipmentApi.available_models_to_me();
-          data = availableData.filter(m => m.category === parseInt(selectedCategory));
-        } else if (onlyAvailable && isAuth) {
+          data = availableData.filter(
+            (m) => m.category === parseInt(selectedCategory),
+          );
+        } else if (onlyAvailable && isAuth && canUseBooking) {
           data = await equipmentApi.available_models_to_me();
-        } else if (selectedCategory !== 'all') {
-          data = await equipmentApi.get_model_by_category(parseInt(selectedCategory) as EquipmentCategory);
+        } else if (selectedCategory !== "all") {
+          data = await equipmentApi.get_model_by_category(
+            parseInt(selectedCategory) as EquipmentCategory,
+          );
         } else {
           data = await equipmentApi.get_all_models();
         }
@@ -128,8 +146,10 @@ export default function HomePage() {
 
       setModels(data);
     } catch (err: any) {
-      console.error('Ошибка загрузки оборудования:', err);
-      setError(err?.message || 'Не удалось загрузить оборудование. Попробуйте позже.');
+      console.error("Ошибка загрузки оборудования:", err);
+      setError(
+        err?.message || "Не удалось загрузить оборудование. Попробуйте позже.",
+      );
       setModels([]);
     } finally {
       setLoading(false);
@@ -144,7 +164,9 @@ export default function HomePage() {
       let data: EqModelResponseDto[] = [];
 
       try {
-        const searchResult = await equipmentApi.get_model_by_name(searchQuery.trim());
+        const searchResult = await equipmentApi.get_model_by_name(
+          searchQuery.trim(),
+        );
         data = searchResult;
       } catch (searchError: any) {
         if (isNotFoundError(searchError)) {
@@ -154,11 +176,11 @@ export default function HomePage() {
         }
       }
 
-      if (onlyAvailable && isAuth) {
+      if (onlyAvailable && isAuth && canUseBooking) {
         try {
           const available = await equipmentApi.available_models_to_me();
-          const availableIds = new Set(available.map(m => m.id));
-          data = data.filter(m => availableIds.has(m.id));
+          const availableIds = new Set(available.map((m) => m.id));
+          data = data.filter((m) => availableIds.has(m.id));
         } catch (availError: any) {
           if (!isNotFoundError(availError)) {
             throw availError;
@@ -167,14 +189,14 @@ export default function HomePage() {
         }
       }
 
-      if (selectedCategory !== 'all') {
-        data = data.filter(m => m.category === parseInt(selectedCategory));
+      if (selectedCategory !== "all") {
+        data = data.filter((m) => m.category === parseInt(selectedCategory));
       }
 
       setModels(data);
     } catch (err: any) {
-      console.error('Ошибка поиска:', err);
-      setError(err?.message || 'Ошибка при поиске. Попробуйте еще раз.');
+      console.error("Ошибка поиска:", err);
+      setError(err?.message || "Ошибка при поиске. Попробуйте еще раз.");
       setModels([]);
     } finally {
       setLoading(false);
@@ -182,8 +204,8 @@ export default function HomePage() {
   }
 
   function clearFilters() {
-    setSearchQuery('');
-    setSelectedCategory('all');
+    setSearchQuery("");
+    setSelectedCategory("all");
     setOnlyAvailable(false);
     setError(null);
   }
@@ -194,15 +216,20 @@ export default function HomePage() {
 
   async function handleAddToCart(model: EqModelResponseDto) {
     if (!isAuth) {
-      router.push('/login');
+      router.push("/login");
+      return;
+    }
+
+    if (!canUseBooking) {
+      alert("Представителям организаций недоступно бронирование оборудования");
       return;
     }
 
     try {
       await addToCart(model);
     } catch (error) {
-      console.error('Ошибка добавления в корзину:', error);
-      alert('Не удалось добавить оборудование в корзину');
+      console.error("Ошибка добавления в корзину:", error);
+      alert("Не удалось добавить оборудование в корзину");
     }
   }
 
@@ -210,12 +237,13 @@ export default function HomePage() {
     try {
       await removeFromCart(modelId);
     } catch (error) {
-      console.error('Ошибка удаления из корзины:', error);
-      alert('Не удалось изменить корзину');
+      console.error("Ошибка удаления из корзины:", error);
+      alert("Не удалось изменить корзину");
     }
   }
 
-  const hasActiveFilters = searchQuery || selectedCategory !== 'all' || onlyAvailable;
+  const hasActiveFilters =
+    searchQuery || selectedCategory !== "all" || onlyAvailable;
 
   return (
     <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
@@ -232,7 +260,10 @@ export default function HomePage() {
               />
             </div>
 
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+            >
               <SelectTrigger className="w-full md:w-[250px]">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Категория" />
@@ -247,9 +278,9 @@ export default function HomePage() {
               </SelectContent>
             </Select>
 
-            {isAuth && (
+            {isAuth && canUseBooking && (
               <Button
-                variant={onlyAvailable ? 'default' : 'outline'}
+                variant={onlyAvailable ? "default" : "outline"}
                 onClick={() => setOnlyAvailable(!onlyAvailable)}
                 className="whitespace-nowrap"
               >
@@ -257,24 +288,15 @@ export default function HomePage() {
               </Button>
             )}
 
-            {getTotalItems() > 0 && (
+            {canUseBooking && getTotalItems() > 0 && (
               <Button
-                onClick={() => router.push('/cart')}
+                onClick={() => router.push("/cart")}
                 className="whitespace-nowrap"
               >
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 Бронирование ({getTotalItems()})
               </Button>
             )}
-
-            <Button
-              variant="outline"
-              onClick={() => router.push('/event')}
-              className="whitespace-nowrap"
-            >
-              <CalendarPlus className="w-4 h-4 mr-2" />
-              Бронь event
-            </Button>
 
             {hasActiveFilters && (
               <Button
@@ -296,9 +318,13 @@ export default function HomePage() {
                   Поиск: "{searchQuery}"
                 </span>
               )}
-              {selectedCategory !== 'all' && (
+              {selectedCategory !== "all" && (
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                  {categoryNames[parseInt(selectedCategory) as EquipmentCategory]}
+                  {
+                    categoryNames[
+                      parseInt(selectedCategory) as EquipmentCategory
+                    ]
+                  }
                 </span>
               )}
               {onlyAvailable && (
@@ -317,7 +343,9 @@ export default function HomePage() {
                 <AlertCircle className="w-3 h-3 text-destructive" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-destructive mb-1">Произошла ошибка</p>
+                <p className="text-sm font-medium text-destructive mb-1">
+                  Произошла ошибка
+                </p>
                 <p className="text-sm text-destructive/80">{error}</p>
                 <Button
                   variant="outline"
@@ -353,13 +381,14 @@ export default function HomePage() {
                 <Search className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                {hasActiveFilters ? 'Ничего не найдено' : 'Оборудование отсутствует'}
+                {hasActiveFilters
+                  ? "Ничего не найдено"
+                  : "Оборудование отсутствует"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {hasActiveFilters
-                  ? 'Попробуйте изменить параметры поиска или фильтры'
-                  : 'В данный момент в базе нет оборудования'
-                }
+                  ? "Попробуйте изменить параметры поиска или фильтры"
+                  : "В данный момент в базе нет оборудования"}
               </p>
               {hasActiveFilters && (
                 <Button variant="outline" onClick={clearFilters}>
@@ -401,35 +430,53 @@ export default function HomePage() {
 
                     {Object.keys(model.attributes).length > 0 && (
                       <div className="space-y-2 mb-4">
-                        {Object.entries(model.attributes).slice(0, 3).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between bg-secondary/30 backdrop-blur rounded-lg px-3 py-2">
-                            <span className="text-xs text-muted-foreground font-medium">{key}</span>
-                            <span className="text-xs text-foreground font-semibold">{String(value)}</span>
-                          </div>
-                        ))}
+                        {Object.entries(model.attributes)
+                          .slice(0, 3)
+                          .map(([key, value]) => (
+                            <div
+                              key={key}
+                              className="flex items-center justify-between bg-secondary/30 backdrop-blur rounded-lg px-3 py-2"
+                            >
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {key}
+                              </span>
+                              <span className="text-xs text-foreground font-semibold">
+                                {String(value)}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     )}
 
                     <div className="flex items-center gap-2 text-xs mt-auto pt-3 border-t border-border/30">
-                      <div className={`w-2 h-2 rounded-full ${model.access === EquipmentAccess.User ? 'bg-green-500' :
-                        model.access === EquipmentAccess.Osnova ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        } shadow-lg`}></div>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          model.access === EquipmentAccess.User
+                            ? "bg-green-500"
+                            : model.access === EquipmentAccess.Osnova
+                              ? "bg-yellow-500"
+                              : "bg-red-500"
+                        } shadow-lg`}
+                      ></div>
                       <span className="text-muted-foreground">
-                        <span className="text-foreground font-medium">{accessNames[model.access]}</span>
+                        <span className="text-foreground font-medium">
+                          {accessNames[model.access]}
+                        </span>
                       </span>
                     </div>
                   </div>
 
-                  <div className="relative mt-3" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="relative mt-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {quantity === 0 ? (
                       <Button
                         onClick={() => void handleAddToCart(model)}
                         className="w-full h-10"
                         size="sm"
                       >
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        В бронь
+                        <ShoppingCart className="w-4 h-4 mr-2" />В бронь
                       </Button>
                     ) : (
                       <div className="flex items-center justify-between bg-primary/10 rounded-lg p-1 h-10">
@@ -455,7 +502,6 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
-
                 </div>
               );
             })}

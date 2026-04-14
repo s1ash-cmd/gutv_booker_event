@@ -1,11 +1,10 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
-import { Analytics } from "@vercel/analytics/next"
 import { Open_Sans, Roboto } from "next/font/google";
-import { ClientThemeProvider } from "@/components/ThemeProvider";
 import type { ReactNode } from "react";
+import { ClientThemeProvider } from "@/components/ThemeProvider";
 import "@/app/styles/globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
-
 
 const openSans = Open_Sans({
   subsets: ["latin", "cyrillic"],

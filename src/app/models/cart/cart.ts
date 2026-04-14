@@ -1,5 +1,5 @@
-import { EqModelResponseDto } from "@/app/models/equipment/equipment";
-import { BookingResponseDto } from "@/app/models/booking/booking";
+import type { BookingResponseDto } from "@/app/models/booking/booking";
+import type { EqModelResponseDto } from "@/app/models/equipment/equipment";
 
 export interface CartItemDto {
   id: number;

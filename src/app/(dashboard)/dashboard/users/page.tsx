@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, Filter, X, AlertCircle, User as UserIcon, Shield, Ban } from 'lucide-react';
-import { userApi } from '@/lib/userApi';
-import { UserResponseDto } from '@/app/models/user/user';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertCircle,
+  Ban,
+  Filter,
+  Search,
+  Shield,
+  User as UserIcon,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { UserResponseDto } from "@/app/models/user/user";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -22,15 +29,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/table";
+import { userApi } from "@/lib/userApi";
+import { cn } from "@/lib/utils";
 
 function isNotFoundError(error: any): boolean {
   return (
-    error?.message?.includes('не найдено') ||
-    error?.message?.includes('не найден') ||
+    error?.message?.includes("не найдено") ||
+    error?.message?.includes("не найден") ||
     error?.status === 404 ||
-    error?.message?.toLowerCase().includes('not found')
+    error?.message?.toLowerCase().includes("not found")
   );
 }
 
@@ -40,8 +48,8 @@ export default function UsersPage() {
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBanStatus, setSelectedBanStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedBanStatus, setSelectedBanStatus] = useState<string>("all");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const router = useRouter();
 
@@ -63,7 +71,7 @@ export default function UsersPage() {
       const user = await userApi.get_me();
       setCurrentUser(user);
     } catch (err: any) {
-      console.error('Ошибка загрузки текущего пользователя:', err);
+      console.error("Ошибка загрузки текущего пользователя:", err);
     }
   }
 
@@ -86,8 +94,10 @@ export default function UsersPage() {
       setUsers(data);
       setFilteredUsers(data);
     } catch (err: any) {
-      console.error('Ошибка загрузки пользователей:', err);
-      setError(err?.message || 'Не удалось загрузить пользователей. Попробуйте позже.');
+      console.error("Ошибка загрузки пользователей:", err);
+      setError(
+        err?.message || "Не удалось загрузить пользователей. Попробуйте позже.",
+      );
       setUsers([]);
       setFilteredUsers([]);
     } finally {
@@ -98,10 +108,10 @@ export default function UsersPage() {
   async function handleSearch() {
     let filtered = users;
 
-    if (selectedBanStatus === 'banned') {
-      filtered = filtered.filter(u => u.banned);
-    } else if (selectedBanStatus === 'active') {
-      filtered = filtered.filter(u => !u.banned);
+    if (selectedBanStatus === "banned") {
+      filtered = filtered.filter((u) => u.banned);
+    } else if (selectedBanStatus === "active") {
+      filtered = filtered.filter((u) => !u.banned);
     }
 
     if (!searchQuery.trim()) {
@@ -111,10 +121,11 @@ export default function UsersPage() {
 
     const query = searchQuery.trim();
     const lowerQuery = query.toLowerCase();
-    filtered = filtered.filter(u =>
-      u.name.toLowerCase().includes(lowerQuery) ||
-      u.login.toLowerCase().includes(lowerQuery) ||
-      u.telegramUsername?.toLowerCase().includes(lowerQuery)
+    filtered = filtered.filter(
+      (u) =>
+        u.name.toLowerCase().includes(lowerQuery) ||
+        u.login.toLowerCase().includes(lowerQuery) ||
+        u.telegramUsername?.toLowerCase().includes(lowerQuery),
     );
     setFilteredUsers(filtered);
   }
@@ -129,25 +140,25 @@ export default function UsersPage() {
       }
       await loadUsers();
     } catch (err: any) {
-      console.error('Ошибка при изменении статуса бана:', err);
-      setError(err?.message || 'Не удалось изменить статус пользователя');
+      console.error("Ошибка при изменении статуса бана:", err);
+      setError(err?.message || "Не удалось изменить статус пользователя");
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleRoleChange(id: number, newRole: 'admin' | 'user') {
+  async function handleRoleChange(id: number, newRole: "admin" | "user") {
     try {
       setActionLoading(id);
-      if (newRole === 'admin') {
+      if (newRole === "admin") {
         await userApi.make_admin(id);
       } else {
         await userApi.make_user(id);
       }
       await loadUsers();
     } catch (err: any) {
-      console.error('Ошибка при изменении роли:', err);
-      setError(err?.message || 'Не удалось изменить роль пользователя');
+      console.error("Ошибка при изменении роли:", err);
+      setError(err?.message || "Не удалось изменить роль пользователя");
     } finally {
       setActionLoading(null);
     }
@@ -163,16 +174,16 @@ export default function UsersPage() {
       }
       await loadUsers();
     } catch (err: any) {
-      console.error('Ошибка при изменении Ronin доступа:', err);
-      setError(err?.message || 'Не удалось изменить Ronin доступ');
+      console.error("Ошибка при изменении Ronin доступа:", err);
+      setError(err?.message || "Не удалось изменить Ronin доступ");
     } finally {
       setActionLoading(null);
     }
   }
 
   function clearFilters() {
-    setSearchQuery('');
-    setSelectedBanStatus('all');
+    setSearchQuery("");
+    setSelectedBanStatus("all");
     setError(null);
     loadUsers();
   }
@@ -182,7 +193,7 @@ export default function UsersPage() {
   }
 
   function hasRoninAccess(role: string): boolean {
-    return role === 'Ronin' || role === 'Admin';
+    return role === "Ronin" || role === "Admin";
   }
 
   function openUser(userId: number) {
@@ -193,7 +204,7 @@ export default function UsersPage() {
     event.stopPropagation();
   }
 
-  const hasActiveFilters = searchQuery || selectedBanStatus !== 'all';
+  const hasActiveFilters = searchQuery || selectedBanStatus !== "all";
 
   return (
     <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
@@ -214,7 +225,10 @@ export default function UsersPage() {
               />
             </div>
 
-            <Select value={selectedBanStatus} onValueChange={setSelectedBanStatus}>
+            <Select
+              value={selectedBanStatus}
+              onValueChange={setSelectedBanStatus}
+            >
               <SelectTrigger className="w-full lg:w-[180px]">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Статус" />
@@ -246,9 +260,9 @@ export default function UsersPage() {
                   Поиск: "{searchQuery}"
                 </span>
               )}
-              {selectedBanStatus !== 'all' && (
+              {selectedBanStatus !== "all" && (
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                  {selectedBanStatus === 'banned' ? 'Забаненные' : 'Активные'}
+                  {selectedBanStatus === "banned" ? "Забаненные" : "Активные"}
                 </span>
               )}
             </div>
@@ -262,7 +276,9 @@ export default function UsersPage() {
                 <AlertCircle className="w-3 h-3 text-destructive" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-destructive mb-1">Произошла ошибка</p>
+                <p className="text-sm font-medium text-destructive mb-1">
+                  Произошла ошибка
+                </p>
                 <p className="text-sm text-destructive/80">{error}</p>
                 <Button
                   variant="outline"
@@ -294,13 +310,14 @@ export default function UsersPage() {
                 <UserIcon className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                {hasActiveFilters ? 'Ничего не найдено' : 'Пользователи отсутствуют'}
+                {hasActiveFilters
+                  ? "Ничего не найдено"
+                  : "Пользователи отсутствуют"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {hasActiveFilters
-                  ? 'Попробуйте изменить параметры поиска или фильтры'
-                  : 'В данный момент нет пользователей'
-                }
+                  ? "Попробуйте изменить параметры поиска или фильтры"
+                  : "В данный момент нет пользователей"}
               </p>
               {hasActiveFilters && (
                 <Button variant="outline" onClick={clearFilters}>
@@ -315,7 +332,7 @@ export default function UsersPage() {
               {filteredUsers.map((user) => {
                 const isSelf = isCurrentUser(user.id);
                 const roninAccess = hasRoninAccess(user.role);
-                const isAdmin = user.role === 'Admin';
+                const isAdmin = user.role === "Admin";
 
                 return (
                   <div
@@ -327,7 +344,9 @@ export default function UsersPage() {
                       <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
-                          <p className="text-xs font-medium text-red-600 dark:text-red-400">Забанен</p>
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                            Забанен
+                          </p>
                         </div>
                       </div>
                     )}
@@ -337,23 +356,33 @@ export default function UsersPage() {
                         <UserIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <p className={cn(
-                              "font-medium text-sm truncate",
-                              isAdmin ? "text-blue-600 dark:text-blue-400" : ""
-                            )}>
+                            <p
+                              className={cn(
+                                "font-medium text-sm truncate",
+                                isAdmin
+                                  ? "text-blue-600 dark:text-blue-400"
+                                  : "",
+                              )}
+                            >
                               {user.name}
                             </p>
                             {isSelf && (
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Вы</span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                Вы
+                              </span>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">@{user.login}</p>
+                          <p className="text-xs text-muted-foreground">
+                            @{user.login}
+                          </p>
                         </div>
                       </div>
 
                       {user.telegramUsername && (
                         <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                          <p className="text-xs text-muted-foreground mb-1">Telegram</p>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Telegram
+                          </p>
                           <a
                             href={`https://t.me/${user.telegramUsername}`}
                             target="_blank"
@@ -367,11 +396,13 @@ export default function UsersPage() {
 
                       <div className="bg-secondary/30 rounded-lg px-3 py-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">Доступ Ronin</p>
+                          <p className="text-xs text-muted-foreground">
+                            Доступ Ronin
+                          </p>
                           <Checkbox
                             checked={roninAccess}
                             onCheckedChange={(checked) => {
-                              if (!isSelf && checked !== 'indeterminate') {
+                              if (!isSelf && checked !== "indeterminate") {
                                 handleRoninToggle(user.id, roninAccess);
                               }
                             }}
@@ -398,16 +429,16 @@ export default function UsersPage() {
                             ) : (
                               <>
                                 <Ban className="w-3 h-3 mr-1" />
-                                {user.banned ? 'Разбанить' : 'Забанить'}
+                                {user.banned ? "Разбанить" : "Забанить"}
                               </>
                             )}
                           </Button>
 
-                          {user.role !== 'Admin' ? (
+                          {user.role !== "Admin" ? (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleRoleChange(user.id, 'admin')}
+                              onClick={() => handleRoleChange(user.id, "admin")}
                               disabled={actionLoading === user.id}
                               className="w-full"
                             >
@@ -418,7 +449,7 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleRoleChange(user.id, 'user')}
+                              onClick={() => handleRoleChange(user.id, "user")}
                               disabled={actionLoading === user.id}
                               className="w-full"
                             >
@@ -442,7 +473,9 @@ export default function UsersPage() {
                     <TableHead>Логин</TableHead>
                     <TableHead>Telegram</TableHead>
                     <TableHead className="w-[100px]">Статус</TableHead>
-                    <TableHead className="w-[120px] text-center">Ronin</TableHead>
+                    <TableHead className="w-[120px] text-center">
+                      Ronin
+                    </TableHead>
                     <TableHead className="w-[360px]">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -450,7 +483,7 @@ export default function UsersPage() {
                   {filteredUsers.map((user) => {
                     const isSelf = isCurrentUser(user.id);
                     const roninAccess = hasRoninAccess(user.role);
-                    const isAdmin = user.role === 'Admin';
+                    const isAdmin = user.role === "Admin";
 
                     return (
                       <TableRow
@@ -460,18 +493,26 @@ export default function UsersPage() {
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className={cn(
-                              "font-medium",
-                              isAdmin ? "text-blue-600 dark:text-blue-400" : ""
-                            )}>
+                            <span
+                              className={cn(
+                                "font-medium",
+                                isAdmin
+                                  ? "text-blue-600 dark:text-blue-400"
+                                  : "",
+                              )}
+                            >
                               {user.name}
                             </span>
                             {isSelf && (
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Вы</span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                Вы
+                              </span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">@{user.login}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          @{user.login}
+                        </TableCell>
                         <TableCell>
                           {user.telegramUsername ? (
                             <a
@@ -483,18 +524,24 @@ export default function UsersPage() {
                               {user.telegramUsername}
                             </a>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
                           {user.banned ? (
                             <div className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
                               <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
-                              <span className="text-xs font-medium text-red-600 dark:text-red-400">Забанен</span>
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                Забанен
+                              </span>
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
-                              <span className="text-xs font-medium text-green-600 dark:text-green-400">Без бана</span>
+                              <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                                Без бана
+                              </span>
                             </div>
                           )}
                         </TableCell>
@@ -503,7 +550,7 @@ export default function UsersPage() {
                             <Checkbox
                               checked={roninAccess}
                               onCheckedChange={(checked) => {
-                                if (!isSelf && checked !== 'indeterminate') {
+                                if (!isSelf && checked !== "indeterminate") {
                                   handleRoninToggle(user.id, roninAccess);
                                 }
                               }}
@@ -524,7 +571,9 @@ export default function UsersPage() {
                             >
                               <Button
                                 size="sm"
-                                variant={user.banned ? "default" : "destructive"}
+                                variant={
+                                  user.banned ? "default" : "destructive"
+                                }
                                 onClick={() => handleBan(user.id, user.banned)}
                                 disabled={actionLoading === user.id}
                                 className="w-full"
@@ -534,16 +583,18 @@ export default function UsersPage() {
                                 ) : (
                                   <>
                                     <Ban className="w-3 h-3 mr-1" />
-                                    {user.banned ? 'Разбанить' : 'Забанить'}
+                                    {user.banned ? "Разбанить" : "Забанить"}
                                   </>
                                 )}
                               </Button>
 
-                              {user.role !== 'Admin' ? (
+                              {user.role !== "Admin" ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleRoleChange(user.id, 'admin')}
+                                  onClick={() =>
+                                    handleRoleChange(user.id, "admin")
+                                  }
                                   disabled={actionLoading === user.id}
                                   className="w-full"
                                 >
@@ -554,7 +605,9 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleRoleChange(user.id, 'user')}
+                                  onClick={() =>
+                                    handleRoleChange(user.id, "user")
+                                  }
                                   disabled={actionLoading === user.id}
                                   className="w-full"
                                 >

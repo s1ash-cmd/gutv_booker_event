@@ -1,7 +1,7 @@
 import {
-  BookingResponseDto,
+  type BookingResponseDto,
   BookingStatus,
-  CreateBookingRequestDto,
+  type CreateBookingRequestDto,
 } from "@/app/models/booking/booking";
 import { graphqlNamedEnumLiteral } from "./api";
 import { authenticatedGraphqlRequest } from "./authApi";

@@ -1,20 +1,30 @@
 "use client";
 
-import Link from "next/link";
+import {
+  BookOpen,
+  BookUser,
+  CalendarPlus,
+  Home,
+  LogOut,
+  Menu,
+  Moon,
+  Package,
+  Settings,
+  ShoppingCart,
+  SquareTerminal,
+  Sun,
+  User,
+} from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Menu, User, LogOut, Settings, Sun, Moon, Package, ShoppingCart, SquareTerminal, Home, BookOpen, BookUser, CalendarPlus } from "lucide-react";
 import { useState } from "react";
 
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
-
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import { getAvatarUrl } from "@/lib/avatar";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -31,15 +42,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-
-const navItems = [
-  { name: "Главная", href: "/", icon: Home },
-  { name: "Event", href: "/event", icon: CalendarPlus },
-  { name: "Правила", href: "/rules", icon: BookOpen },
-  { name: "Контакты", href: "/contacts", icon: BookUser },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { getAvatarUrl } from "@/lib/avatar";
+import {
+  canBookEquipment,
+  canCreateEvent,
+  isAdminRole,
+  isOrganizationRole,
+} from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 export function Header() {
   const pathname = usePathname();
@@ -70,7 +81,24 @@ export function Header() {
     );
   }
 
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = isAdminRole(user?.role);
+  const isOrganization = isOrganizationRole(user?.role);
+  const canOpenEvent = canCreateEvent(user?.role);
+  const canOpenCart = canBookEquipment(user?.role);
+  const personalDashboardHref = isOrganization
+    ? "/dashboard/events/my"
+    : "/dashboard/bookings/my";
+  const personalDashboardLabel = isOrganization
+    ? "Мои заявки"
+    : "Мои бронирования";
+  const navItems = [
+    { name: "Главная", href: "/", icon: Home },
+    ...(canOpenEvent
+      ? [{ name: "Мероприятия", href: "/event", icon: CalendarPlus }]
+      : []),
+    { name: "Правила", href: "/rules", icon: BookOpen },
+    { name: "Контакты", href: "/contacts", icon: BookUser },
+  ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/30 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
@@ -79,11 +107,18 @@ export function Header() {
           {isAuth && user ? (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden shrink-0 hover:bg-secondary/50">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden shrink-0 hover:bg-secondary/50"
+                >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden">
+              <SheetContent
+                side="left"
+                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden"
+              >
                 <SheetHeader className="sr-only">
                   <SheetTitle>Навигационное меню</SheetTitle>
                   <SheetDescription>
@@ -135,16 +170,18 @@ export function Header() {
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                                 isActive
                                   ? "bg-secondary text-foreground font-medium"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                               )}
                             >
                               {isActive && (
                                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
                               )}
-                              <item.icon className={cn(
-                                "w-4 h-4 ml-2 transition-colors shrink-0",
-                                isActive ? "text-primary" : ""
-                              )} />
+                              <item.icon
+                                className={cn(
+                                  "w-4 h-4 ml-2 transition-colors shrink-0",
+                                  isActive ? "text-primary" : "",
+                                )}
+                              />
                               <span className="text-sm">{item.name}</span>
                             </Link>
                           );
@@ -164,16 +201,18 @@ export function Header() {
                             className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all duration-200"
                           >
                             <SquareTerminal className="w-4 h-4 ml-2 shrink-0" />
-                            <span className="text-sm font-semibold">Панель управления</span>
+                            <span className="text-sm font-semibold">
+                              Панель управления
+                            </span>
                           </Link>
                         )}
                         <Link
-                          href="/dashboard/bookings/my"
+                          href={personalDashboardHref}
                           onClick={closeMobileMenu}
                           className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200"
                         >
                           <Package className="w-4 h-4 ml-2 shrink-0" />
-                          <span className="text-sm">Мои бронирования</span>
+                          <span className="text-sm">{personalDashboardLabel}</span>
                         </Link>
                         <Link
                           href="/dashboard/settings"
@@ -207,7 +246,7 @@ export function Header() {
                             <AvatarFallback
                               className={cn(
                                 "text-sm font-bold",
-                                isAdmin && "bg-primary text-primary-foreground"
+                                isAdmin && "bg-primary text-primary-foreground",
                               )}
                             >
                               {getInitials(user.login)}
@@ -239,7 +278,9 @@ export function Header() {
                       <Button
                         variant="ghost"
                         className="w-full justify-start gap-3 hover:bg-secondary/50"
-                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                        onClick={() =>
+                          setTheme(theme === "dark" ? "light" : "dark")
+                        }
                       >
                         <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center relative shrink-0">
                           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -268,11 +309,18 @@ export function Header() {
           ) : (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="sm:hidden shrink-0 hover:bg-secondary/50">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden shrink-0 hover:bg-secondary/50"
+                >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden">
+              <SheetContent
+                side="left"
+                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden"
+              >
                 <SheetHeader className="sr-only">
                   <SheetTitle>Навигационное меню</SheetTitle>
                   <SheetDescription>
@@ -324,16 +372,18 @@ export function Header() {
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                                 isActive
                                   ? "bg-secondary text-foreground font-medium"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                               )}
                             >
                               {isActive && (
                                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
                               )}
-                              <item.icon className={cn(
-                                "w-4 h-4 ml-2 transition-colors shrink-0",
-                                isActive ? "text-primary" : ""
-                              )} />
+                              <item.icon
+                                className={cn(
+                                  "w-4 h-4 ml-2 transition-colors shrink-0",
+                                  isActive ? "text-primary" : "",
+                                )}
+                              />
                               <span className="text-sm">{item.name}</span>
                             </Link>
                           );
@@ -343,10 +393,19 @@ export function Header() {
                   </div>
 
                   <div className="p-3 border-t border-border/30 bg-gradient-to-t from-background/60 to-transparent space-y-2">
-                    <Button asChild variant="outline" onClick={closeMobileMenu} className="w-full">
+                    <Button
+                      asChild
+                      variant="outline"
+                      onClick={closeMobileMenu}
+                      className="w-full"
+                    >
                       <Link href="/login">Войти</Link>
                     </Button>
-                    <Button asChild onClick={closeMobileMenu} className="w-full">
+                    <Button
+                      asChild
+                      onClick={closeMobileMenu}
+                      className="w-full"
+                    >
                       <Link href="/register">Регистрация</Link>
                     </Button>
                   </div>
@@ -383,7 +442,7 @@ export function Header() {
                   "relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200",
                   pathname === item.href
                     ? "text-foreground bg-secondary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                 )}
               >
                 {item.name}
@@ -393,17 +452,19 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            asChild
-            className="relative hover:bg-secondary/50"
-            aria-label="Перейти к корзине"
-          >
-            <Link href="/cart">
-              <ShoppingCart className="h-[1.1rem] w-[1.1rem]" />
-            </Link>
-          </Button>
+          {canOpenCart && (
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="relative hover:bg-secondary/50"
+              aria-label="Перейти к корзине"
+            >
+              <Link href="/cart">
+                <ShoppingCart className="h-[1.1rem] w-[1.1rem]" />
+              </Link>
+            </Button>
+          )}
 
           <Button
             variant="ghost"
@@ -420,7 +481,10 @@ export function Header() {
             <div className="flex items-center gap-2 ml-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-9 w-9 rounded-full group hidden md:flex hover:bg-secondary/50">
+                  <Button
+                    variant="ghost"
+                    className="relative h-9 w-9 rounded-full group hidden md:flex hover:bg-secondary/50"
+                  >
                     {isAdmin && (
                       <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75 group-hover:opacity-100 transition duration-300"></div>
                     )}
@@ -429,10 +493,12 @@ export function Header() {
                         src={getAvatarUrl(user.login, user.role)}
                         alt={user.login}
                       />
-                      <AvatarFallback className={cn(
-                        "text-sm font-bold",
-                        isAdmin && "bg-primary text-primary-foreground"
-                      )}>
+                      <AvatarFallback
+                        className={cn(
+                          "text-sm font-bold",
+                          isAdmin && "bg-primary text-primary-foreground",
+                        )}
+                      >
                         {getInitials(user.login)}
                       </AvatarFallback>
                     </Avatar>
@@ -440,9 +506,14 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuItem asChild className="cursor-pointer">
-                    <Link href="/dashboard/profile" className="flex flex-col items-start space-y-1 py-2">
+                    <Link
+                      href="/dashboard/profile"
+                      className="flex flex-col items-start space-y-1 py-2"
+                    >
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium leading-none">{user.name}</p>
+                        <p className="text-sm font-medium leading-none">
+                          {user.name}
+                        </p>
                         {isAdmin && (
                           <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-primary/20">
                             <span className="w-1 h-1 bg-primary rounded-full animate-pulse"></span>
@@ -465,7 +536,9 @@ export function Header() {
                           className="cursor-pointer text-blue-600 focus:text-blue-600 focus:bg-blue-50 dark:focus:bg-blue-950/20"
                         >
                           <SquareTerminal className="mr-2 h-4 w-4" />
-                          <span className="font-semibold">Панель управления</span>
+                          <span className="font-semibold">
+                            Панель управления
+                          </span>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -473,9 +546,12 @@ export function Header() {
                   )}
 
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/bookings/my" className="cursor-pointer">
+                    <Link
+                      href={personalDashboardHref}
+                      className="cursor-pointer"
+                    >
                       <Package className="mr-2 h-4 w-4" />
-                      <span>Мои бронирования</span>
+                      <span>{personalDashboardLabel}</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -494,19 +570,21 @@ export function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
             </div>
           ) : (
             <>
               <div className="hidden sm:flex items-center gap-2 ml-2">
-                <Button variant="ghost" asChild className="hover:bg-secondary/50">
+                <Button
+                  variant="ghost"
+                  asChild
+                  className="hover:bg-secondary/50"
+                >
                   <Link href="/login">Войти</Link>
                 </Button>
                 <Button asChild>
                   <Link href="/register">Регистрация</Link>
                 </Button>
               </div>
-
             </>
           )}
         </div>

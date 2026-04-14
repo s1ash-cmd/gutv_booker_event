@@ -2,7 +2,6 @@
 
 import {
   Calendar,
-  CalendarRange,
   LogOut,
   Moon,
   Package,
@@ -10,10 +9,10 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
@@ -34,16 +33,12 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvatarUrl } from "@/lib/avatar";
+import { isOrganizationRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-
-const mainMenuItems = [
-  { title: "Мои бронирования", icon: Package, href: "/dashboard/bookings/my" },
-  { title: "Настройки", icon: Settings, href: "/dashboard/settings" },
-];
 
 const adminMenuItems = [
   { title: "Все бронирования", icon: Calendar, href: "/dashboard/bookings" },
-  { title: "Заявки event", icon: CalendarRange, href: "/dashboard/events" },
+  { title: "Заявки на event", icon: Calendar, href: "/dashboard/events" },
   { title: "Оборудование", icon: Package, href: "/dashboard/equipment" },
   { title: "Пользователи", icon: Users, href: "/dashboard/users" },
 ];
@@ -60,8 +55,17 @@ export function AppSidebar() {
   if (!user) return null;
 
   const isAdmin = user.role === "Admin";
+  const isOrganization = isOrganizationRole(user.role);
+  const mainMenuItems = [
+    {
+      title: isOrganization ? "Мои заявки" : "Мои бронирования",
+      icon: Package,
+      href: isOrganization ? "/dashboard/events/my" : "/dashboard/bookings/my",
+    },
+    { title: "Настройки", icon: Settings, href: "/dashboard/settings" },
+  ];
 
-  const renderMenuItem = (item: typeof mainMenuItems[0]) => {
+  const renderMenuItem = (item: { title: string; icon: any; href: string }) => {
     const isActive = pathname === item.href;
     return (
       <SidebarMenuItem key={item.href}>
@@ -72,17 +76,19 @@ export function AppSidebar() {
               "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
               isActive
                 ? "bg-secondary text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
             )}
           >
             {isActive && (
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
             )}
 
-            <item.icon className={cn(
-              "w-4 h-4 ml-2 transition-colors",
-              isActive ? "text-primary" : ""
-            )} />
+            <item.icon
+              className={cn(
+                "w-4 h-4 ml-2 transition-colors",
+                isActive ? "text-primary" : "",
+              )}
+            />
             <span className="text-sm">{item.title}</span>
           </Link>
         </SidebarMenuButton>
@@ -168,7 +174,7 @@ export function AppSidebar() {
                 <AvatarFallback
                   className={cn(
                     "text-sm font-bold",
-                    isAdmin && "bg-primary text-primary-foreground"
+                    isAdmin && "bg-primary text-primary-foreground",
                   )}
                 >
                   {getInitials(user.login)}

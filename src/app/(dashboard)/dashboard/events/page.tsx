@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  CalendarRange,
   AlertCircle,
-  Filter,
-  X,
   Calendar,
+  CalendarRange,
   Clock,
+  Filter,
   Search,
+  X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { BookingStatus } from "@/app/models/booking/booking";
+import type { EventResponseDto } from "@/app/models/event/event";
 import { AdminOnly } from "@/components/AdminOnly";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +31,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { BookingStatus } from "@/app/models/booking/booking";
-import { EventResponseDto } from "@/app/models/event/event";
 import { eventApi } from "@/lib/eventApi";
+import { formatWarningMessages } from "@/lib/userFacingMessages";
+import { cn } from "@/lib/utils";
 
 const statusNames: Record<string, string> = {
   Pending: "Ожидает",
@@ -111,7 +112,7 @@ export default function EventsDashboardPage() {
       setError(
         isNotFoundError(loadError)
           ? null
-          : loadError?.message || "Не удалось загрузить event заявки"
+          : loadError?.message || "Не удалось загрузить event заявки",
       );
     } finally {
       setLoading(false);
@@ -127,7 +128,9 @@ export default function EventsDashboardPage() {
     const query = searchQuery.trim();
 
     if (/^\d+$/.test(query)) {
-      const filtered = events.filter((event) => event.id === Number.parseInt(query, 10));
+      const filtered = events.filter(
+        (event) => event.id === Number.parseInt(query, 10),
+      );
       setFilteredEvents(filtered);
       return;
     }
@@ -138,7 +141,7 @@ export default function EventsDashboardPage() {
         event.client.toLowerCase().includes(lowerQuery) ||
         event.reason.toLowerCase().includes(lowerQuery) ||
         (event.comment?.toLowerCase().includes(lowerQuery) ?? false) ||
-        (event.adminComment?.toLowerCase().includes(lowerQuery) ?? false)
+        (event.adminComment?.toLowerCase().includes(lowerQuery) ?? false),
     );
 
     setFilteredEvents(filtered);
@@ -168,7 +171,9 @@ export default function EventsDashboardPage() {
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Заявки на event</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                Заявки на event
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Просмотр заявок, созданных через форму event
               </p>
@@ -219,7 +224,8 @@ export default function EventsDashboardPage() {
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                 {searchQuery && (
                   <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                    {/^\d+$/.test(searchQuery.trim()) ? 'ID: ' : 'Поиск: '}"{searchQuery}"
+                    {/^\d+$/.test(searchQuery.trim()) ? "ID: " : "Поиск: "}"
+                    {searchQuery}"
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
@@ -236,7 +242,9 @@ export default function EventsDashboardPage() {
                   <AlertCircle className="w-3 h-3 text-destructive" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-destructive mb-1">Произошла ошибка</p>
+                  <p className="text-sm font-medium text-destructive mb-1">
+                    Произошла ошибка
+                  </p>
                   <p className="text-sm text-destructive/80">{error}</p>
                   <Button
                     variant="outline"
@@ -265,7 +273,9 @@ export default function EventsDashboardPage() {
                   <CalendarRange className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {hasActiveFilters ? "Ничего не найдено" : "Заявки отсутствуют"}
+                  {hasActiveFilters
+                    ? "Ничего не найдено"
+                    : "Заявки отсутствуют"}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   {hasActiveFilters
@@ -293,7 +303,7 @@ export default function EventsDashboardPage() {
                         <div
                           className={cn(
                             "w-2 h-2 rounded-full",
-                            statusColors[event.status] || "bg-gray-500"
+                            statusColors[event.status] || "bg-gray-500",
                           )}
                         ></div>
                         <span className="text-sm font-medium">
@@ -305,7 +315,7 @@ export default function EventsDashboardPage() {
                       </span>
                     </div>
 
-                    {Object.keys(event.warnings).length > 0 && (
+                    {formatWarningMessages(event.warnings).length > 0 && (
                       <div className="mb-3 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 mb-1">
                           <AlertCircle className="w-3 h-3 text-orange-600 dark:text-orange-400" />
@@ -314,33 +324,41 @@ export default function EventsDashboardPage() {
                           </p>
                         </div>
                         <div className="space-y-1">
-                          {Object.entries(event.warnings).map(([key, value]) => (
-                            <p
-                              key={key}
-                              className="text-xs text-orange-600 dark:text-orange-400"
-                            >
-                              {key}: {String(value)}
-                            </p>
-                          ))}
+                          {formatWarningMessages(event.warnings).map(
+                            (message) => (
+                              <p
+                                key={message}
+                                className="text-xs text-orange-600 dark:text-orange-400"
+                              >
+                                {message}
+                              </p>
+                            ),
+                          )}
                         </div>
                       </div>
                     )}
 
                     <div className="space-y-2">
                       <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                        <p className="text-xs text-muted-foreground mb-1">Клиент</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Клиент
+                        </p>
                         <p className="text-sm font-medium">{event.client}</p>
                       </div>
 
                       <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                        <p className="text-xs text-muted-foreground mb-1">Причина</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Причина
+                        </p>
                         <p className="text-sm line-clamp-3">{event.reason}</p>
                       </div>
 
                       <div className="flex items-center gap-2 text-xs">
                         <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
-                          <p className="truncate">{formatDateTime(event.startTime)}</p>
+                          <p className="truncate">
+                            {formatDateTime(event.startTime)}
+                          </p>
                           <p className="text-muted-foreground truncate">
                             {formatDateTime(event.endTime)}
                           </p>
@@ -369,7 +387,9 @@ export default function EventsDashboardPage() {
                               <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">
                                 Админ:
                               </p>
-                              <p className="line-clamp-2">{event.adminComment}</p>
+                              <p className="line-clamp-2">
+                                {event.adminComment}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -389,8 +409,12 @@ export default function EventsDashboardPage() {
                       <TableHead className="max-w-[240px]">Причина</TableHead>
                       <TableHead>Период</TableHead>
                       <TableHead>Создано</TableHead>
-                      <TableHead className="max-w-[220px]">Комментарии</TableHead>
-                      <TableHead className="w-[220px]">Предупреждения</TableHead>
+                      <TableHead className="max-w-[220px]">
+                        Комментарии
+                      </TableHead>
+                      <TableHead className="w-[220px]">
+                        Предупреждения
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -398,7 +422,9 @@ export default function EventsDashboardPage() {
                       <TableRow
                         key={event.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => router.push(`/dashboard/events/${event.id}`)}
+                        onClick={() =>
+                          router.push(`/dashboard/events/${event.id}`)
+                        }
                       >
                         <TableCell className="font-mono text-muted-foreground">
                           #{event.id}
@@ -408,7 +434,7 @@ export default function EventsDashboardPage() {
                             <div
                               className={cn(
                                 "w-2 h-2 rounded-full",
-                                statusColors[event.status] || "bg-gray-500"
+                                statusColors[event.status] || "bg-gray-500",
                               )}
                             ></div>
                             <span className="text-sm">
@@ -420,7 +446,10 @@ export default function EventsDashboardPage() {
                           <p className="font-medium">{event.client}</p>
                         </TableCell>
                         <TableCell>
-                          <p className="line-clamp-2 max-w-[240px]" title={event.reason}>
+                          <p
+                            className="line-clamp-2 max-w-[240px]"
+                            title={event.reason}
+                          >
                             {event.reason}
                           </p>
                         </TableCell>
@@ -450,30 +479,38 @@ export default function EventsDashboardPage() {
                                 <p className="text-purple-600 dark:text-purple-400 font-medium mb-0.5">
                                   Админ:
                                 </p>
-                                <p className="line-clamp-2">{event.adminComment}</p>
+                                <p className="line-clamp-2">
+                                  {event.adminComment}
+                                </p>
                               </div>
                             )}
                             {!event.comment && !event.adminComment && (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {Object.keys(event.warnings).length > 0 ? (
+                          {formatWarningMessages(event.warnings).length > 0 ? (
                             <div className="space-y-1 w-full">
-                              {Object.entries(event.warnings).map(([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="text-xs bg-orange-500/10 border border-orange-500/20 rounded px-2 py-1"
-                                >
-                                  <p className="text-orange-600 dark:text-orange-400 font-medium break-words whitespace-normal">
-                                    {key}: {String(value)}
-                                  </p>
-                                </div>
-                              ))}
+                              {formatWarningMessages(event.warnings).map(
+                                (message) => (
+                                  <div
+                                    key={message}
+                                    className="text-xs bg-orange-500/10 border border-orange-500/20 rounded px-2 py-1"
+                                  >
+                                    <p className="text-orange-600 dark:text-orange-400 font-medium break-words whitespace-normal">
+                                      {message}
+                                    </p>
+                                  </div>
+                                ),
+                              )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>

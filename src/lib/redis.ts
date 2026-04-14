@@ -1,10 +1,10 @@
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 const getRedisUrl = () => {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;
   }
-  throw new Error('REDIS_URL не установлен');
+  throw new Error("REDIS_URL не установлен");
 };
 
 const globalForRedis = globalThis as unknown as {
@@ -13,6 +13,6 @@ const globalForRedis = globalThis as unknown as {
 
 export const redis = globalForRedis.redis ?? new Redis(getRedisUrl());
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   globalForRedis.redis = redis;
 }

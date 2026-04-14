@@ -1,14 +1,14 @@
-import { prisma } from '@/lib/prisma'
-import { EquipmentModel, EquipmentItem } from '@/generated/prisma/client'
+import { BookingStatus } from "@/app/models/booking/booking";
 import {
-  EqModelResponseDto,
-  CreateEqModelRequestDto,
-  EqItemResponseDto,
-  EqModelWithItemsDto,
+  type CreateEqModelRequestDto,
+  type EqItemResponseDto,
+  type EqModelResponseDto,
+  type EqModelWithItemsDto,
+  EquipmentAccess,
   EquipmentCategory,
-  EquipmentAccess
-} from '@/app/models/equipment/equipment'
-import { BookingStatus } from '@/app/models/booking/booking'
+} from "@/app/models/equipment/equipment";
+import { EquipmentItem, type EquipmentModel } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export class EquipmentService {
   static eqModelToResponseDto(eqModel: EquipmentModel): EqModelResponseDto {
@@ -18,30 +18,30 @@ export class EquipmentService {
       description: eqModel.description,
       category: eqModel.category,
       access: eqModel.access,
-      attributes: JSON.parse(eqModel.attributesJson)
-    }
+      attributes: JSON.parse(eqModel.attributesJson),
+    };
   }
 
   static createDtoToEqModel(eqModel: CreateEqModelRequestDto) {
     if (!eqModel) {
-      throw new Error('Данные оборудования не могут быть пустыми')
+      throw new Error("Данные оборудования не могут быть пустыми");
     }
 
-    let access = EquipmentAccess.User
+    let access = EquipmentAccess.User;
 
-    if (eqModel.name.toLowerCase().includes('ronin')) {
-      access = EquipmentAccess.Ronin
+    if (eqModel.name.toLowerCase().includes("ronin")) {
+      access = EquipmentAccess.Ronin;
     } else if (eqModel.osnova) {
-      access = EquipmentAccess.Osnova
+      access = EquipmentAccess.Osnova;
     }
 
     return {
       name: eqModel.name,
-      description: eqModel.description,
+      description: eqModel.description ?? "",
       category: eqModel.category,
       attributesJson: JSON.stringify(eqModel.attributes ?? {}),
-      access
-    }
+      access,
+    };
   }
 
   static eqItemToResponseDto(item: any): EqItemResponseDto {
@@ -50,173 +50,184 @@ export class EquipmentService {
       inventoryNumber: item.inventoryNumber,
       available: item.available,
       modelName: item.equipmentModel.name,
-      modelCategory: EquipmentCategory[item.equipmentModel.category as number]
-    }
+      modelCategory: EquipmentCategory[item.equipmentModel.category as number],
+    };
   }
 
   createDtoToEqModel(eqModel: CreateEqModelRequestDto) {
     if (!eqModel) {
-      throw new Error('Данные оборудования не могут быть пустыми')
+      throw new Error("Данные оборудования не могут быть пустыми");
     }
 
-    let access = EquipmentAccess.User
+    let access = EquipmentAccess.User;
 
-    if (eqModel.name.toLowerCase().includes('ronin')) {
-      access = EquipmentAccess.Ronin
+    if (eqModel.name.toLowerCase().includes("ronin")) {
+      access = EquipmentAccess.Ronin;
     } else if (eqModel.osnova) {
-      access = EquipmentAccess.Osnova
+      access = EquipmentAccess.Osnova;
     }
 
     return {
       name: eqModel.name,
-      description: eqModel.description,
+      description: eqModel.description ?? "",
       category: eqModel.category,
       attributesJson: JSON.stringify(eqModel.attributes ?? {}),
-      access
-    }
+      access,
+    };
   }
 
-  async createEquipmentModel(eqModel: CreateEqModelRequestDto): Promise<EqModelResponseDto> {
+  async createEquipmentModel(
+    eqModel: CreateEqModelRequestDto,
+  ): Promise<EqModelResponseDto> {
     if (!eqModel) {
-      throw new Error('Данные оборудования не могут быть пустыми')
+      throw new Error("Данные оборудования не могут быть пустыми");
     }
 
     const existing = await prisma.equipmentModel.findFirst({
       where: {
         name: {
           equals: eqModel.name,
-          mode: 'insensitive'
-        }
-      }
-    })
+          mode: "insensitive",
+        },
+      },
+    });
 
     if (existing) {
-      throw new Error('Оборудование с таким названием уже существует')
+      throw new Error("Оборудование с таким названием уже существует");
     }
 
     const equipmentModel = await prisma.equipmentModel.create({
-      data: EquipmentService.createDtoToEqModel(eqModel)
-    })
+      data: EquipmentService.createDtoToEqModel(eqModel),
+    });
 
-    return EquipmentService.eqModelToResponseDto(equipmentModel)
+    return EquipmentService.eqModelToResponseDto(equipmentModel);
   }
 
   async getAllEquipmentModels(): Promise<EqModelResponseDto[]> {
-    const eqModels = await prisma.equipmentModel.findMany()
-    return eqModels.map(EquipmentService.eqModelToResponseDto)
+    const eqModels = await prisma.equipmentModel.findMany();
+    return eqModels.map(EquipmentService.eqModelToResponseDto);
   }
 
   async getEquipmentModelById(id: number): Promise<EqModelResponseDto> {
     if (id <= 0) {
-      throw new Error('Некорректный ID')
+      throw new Error("Некорректный ID");
     }
 
     const eqModel = await prisma.equipmentModel.findUnique({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!eqModel) {
-      throw new Error(`Модель оборудования с ID ${id} не найдена`)
+      throw new Error(`Модель оборудования с ID ${id} не найдена`);
     }
 
-    return EquipmentService.eqModelToResponseDto(eqModel)
+    return EquipmentService.eqModelToResponseDto(eqModel);
   }
 
   async getEquipmentModelByName(name: string): Promise<EqModelResponseDto[]> {
-    if (!name || name.trim() === '') {
-      throw new Error('Название не может быть пустым')
+    if (!name || name.trim() === "") {
+      throw new Error("Название не может быть пустым");
     }
 
     const eqModels = await prisma.equipmentModel.findMany({
       where: {
         name: {
           contains: name,
-          mode: 'insensitive'
-        }
-      }
-    })
+          mode: "insensitive",
+        },
+      },
+    });
 
     if (eqModels.length === 0) {
-      throw new Error(`Оборудование с названием '${name}' не найдено`)
+      throw new Error(`Оборудование с названием '${name}' не найдено`);
     }
 
-    return eqModels.map(m => EquipmentService.eqModelToResponseDto(m))
+    return eqModels.map((m) => EquipmentService.eqModelToResponseDto(m));
   }
 
-  async getEquipmentModelByCategory(category: EquipmentCategory): Promise<EqModelResponseDto[]> {
+  async getEquipmentModelByCategory(
+    category: EquipmentCategory,
+  ): Promise<EqModelResponseDto[]> {
     const eqModels = await prisma.equipmentModel.findMany({
-      where: { category }
-    })
+      where: { category },
+    });
 
     if (eqModels.length === 0) {
-      throw new Error(`Оборудование категории ${category} не найдено`)
+      throw new Error(`Оборудование категории ${category} не найдено`);
     }
 
-    return eqModels.map(m => EquipmentService.eqModelToResponseDto(m))
+    return eqModels.map((m) => EquipmentService.eqModelToResponseDto(m));
   }
 
   async getAvailableToMe(userId: number): Promise<EqModelResponseDto[]> {
     const user = await prisma.user.findUnique({
-      where: { id: userId }
-    })
+      where: { id: userId },
+    });
 
     if (!user) {
-      throw new Error('Пользователь не найден')
+      throw new Error("Пользователь не найден");
     }
 
-    let whereClause = {}
+    let whereClause = {};
 
     switch (user.role) {
       case 3:
-        break
+        break;
 
       case 2:
         whereClause = {
           access: {
-            in: [EquipmentAccess.User, EquipmentAccess.Osnova, EquipmentAccess.Ronin]
-          }
-        }
-        break
+            in: [
+              EquipmentAccess.User,
+              EquipmentAccess.Osnova,
+              EquipmentAccess.Ronin,
+            ],
+          },
+        };
+        break;
 
       case 1:
         whereClause = {
           access: {
-            in: [EquipmentAccess.User, EquipmentAccess.Osnova]
-          }
-        }
-        break
+            in: [EquipmentAccess.User, EquipmentAccess.Osnova],
+          },
+        };
+        break;
 
       case 0:
         whereClause = {
-          access: EquipmentAccess.User
-        }
-        break
+          access: EquipmentAccess.User,
+        };
+        break;
 
       default:
-        throw new Error(`Неизвестная роль пользователя: ${String(user.role)}`)
+        throw new Error(`Неизвестная роль пользователя: ${String(user.role)}`);
     }
 
     const eqModels = await prisma.equipmentModel.findMany({
-      where: whereClause
-    })
+      where: whereClause,
+    });
 
-    return eqModels.map(m => EquipmentService.eqModelToResponseDto(m))
+    return eqModels.map((m) => EquipmentService.eqModelToResponseDto(m));
   }
 
-  async updateEquipmentModel(id: number, eqModel: CreateEqModelRequestDto): Promise<void> {
+  async updateEquipmentModel(
+    id: number,
+    eqModel: CreateEqModelRequestDto,
+  ): Promise<void> {
     if (id <= 0) {
-      throw new Error('ID должен быть положительным')
+      throw new Error("ID должен быть положительным");
     }
     if (!eqModel) {
-      throw new Error('Данные оборудования не могут быть пустыми')
+      throw new Error("Данные оборудования не могут быть пустыми");
     }
 
     const existingModel = await prisma.equipmentModel.findUnique({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!existingModel) {
-      throw new Error(`Модель оборудования с ID ${id} не найдена`)
+      throw new Error(`Модель оборудования с ID ${id} не найдена`);
     }
 
     const nameExists = await prisma.equipmentModel.findFirst({
@@ -226,37 +237,37 @@ export class EquipmentService {
           {
             name: {
               equals: eqModel.name.trim(),
-              mode: 'insensitive'
-            }
-          }
-        ]
-      }
-    })
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+    });
 
     if (nameExists) {
-      throw new Error('Оборудование с таким названием уже существует')
+      throw new Error("Оборудование с таким названием уже существует");
     }
 
-    const updatedData = EquipmentService.createDtoToEqModel(eqModel)
+    const updatedData = EquipmentService.createDtoToEqModel(eqModel);
 
     await prisma.equipmentModel.update({
       where: { id },
-      data: updatedData
-    })
+      data: updatedData,
+    });
   }
 
   async deleteEquipmentModel(id: number): Promise<void> {
     const eqModel = await prisma.equipmentModel.findUnique({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!eqModel) {
-      throw new Error(`Модель оборудования с ID ${id} не найдена`)
+      throw new Error(`Модель оборудования с ID ${id} не найдена`);
     }
 
     await prisma.equipmentModel.delete({
-      where: { id }
-    })
+      where: { id },
+    });
   }
 
   eqItemToResponseDto(item: any): EqItemResponseDto {
@@ -265,60 +276,63 @@ export class EquipmentService {
       inventoryNumber: item.inventoryNumber,
       available: item.available,
       modelName: item.equipmentModel.name,
-      modelCategory: EquipmentCategory[item.equipmentModel.category]
-    }
+      modelCategory: EquipmentCategory[item.equipmentModel.category],
+    };
   }
 
-  async createEquipmentItem(equipmentModelId: number): Promise<EqItemResponseDto> {
+  async createEquipmentItem(
+    equipmentModelId: number,
+  ): Promise<EqItemResponseDto> {
     const model = await prisma.equipmentModel.findUnique({
-      where: { id: equipmentModelId }
-    })
+      where: { id: equipmentModelId },
+    });
 
     if (!model) {
-      throw new Error('Модель оборудования не найдена')
+      throw new Error("Модель оборудования не найдена");
     }
 
-    const categoryCode = model.category
+    const categoryCode = model.category;
 
-    let attempts = 0
-    const maxAttempts = 5
+    let attempts = 0;
+    const maxAttempts = 5;
 
     while (attempts < maxAttempts) {
       try {
         const count = await prisma.equipmentItem.count({
-          where: { equipmentModelId }
-        })
+          where: { equipmentModelId },
+        });
 
-        const nextNumber = count + 1
-        const inventoryNumber = `${categoryCode}-${equipmentModelId.toString().padStart(3, '0')}-${nextNumber.toString().padStart(2, '0')}`
+        const nextNumber = count + 1;
+        const inventoryNumber = `${categoryCode}-${equipmentModelId.toString().padStart(3, "0")}-${nextNumber.toString().padStart(2, "0")}`;
 
         const newItem = await prisma.equipmentItem.create({
           data: {
             equipmentModelId,
             inventoryNumber,
-            available: true
+            available: true,
           },
           include: {
-            equipmentModel: true
-          }
-        })
+            equipmentModel: true,
+          },
+        });
 
-        return EquipmentService.eqItemToResponseDto(newItem)
-
+        return EquipmentService.eqItemToResponseDto(newItem);
       } catch (error: any) {
-        if (error.code === 'P2002') {
-          attempts++
+        if (error.code === "P2002") {
+          attempts++;
           if (attempts >= maxAttempts) {
-            throw new Error('Не удалось создать экземпляр после нескольких попыток')
+            throw new Error(
+              "Не удалось создать экземпляр после нескольких попыток",
+            );
           }
-          await new Promise(resolve => setTimeout(resolve, 100 * attempts))
-          continue
+          await new Promise((resolve) => setTimeout(resolve, 100 * attempts));
+          continue;
         }
-        throw error
+        throw error;
       }
     }
 
-    throw new Error('Не удалось создать экземпляр')
+    throw new Error("Не удалось создать экземпляр");
   }
 
   async getModelsWithItems(): Promise<EqModelWithItemsDto[]> {
@@ -326,108 +340,116 @@ export class EquipmentService {
       include: {
         equipmentItems: {
           include: {
-            equipmentModel: true
-          }
-        }
-      }
-    })
+            equipmentModel: true,
+          },
+        },
+      },
+    });
 
-    return eqModels.map(m => ({
+    return eqModels.map((m) => ({
       id: m.id,
       name: m.name,
       description: m.description,
       category: m.category,
       access: m.access,
       attributes: JSON.parse(m.attributesJson),
-      items: m.equipmentItems.map(i => EquipmentService.eqItemToResponseDto(i))
-    }))
+      items: m.equipmentItems.map((i) =>
+        EquipmentService.eqItemToResponseDto(i),
+      ),
+    }));
   }
 
   async getAllEquipmentItems(): Promise<EqItemResponseDto[]> {
     const items = await prisma.equipmentItem.findMany({
       include: {
-        equipmentModel: true
-      }
-    })
+        equipmentModel: true,
+      },
+    });
 
-    return items.map(i => EquipmentService.eqItemToResponseDto(i))
+    return items.map((i) => EquipmentService.eqItemToResponseDto(i));
   }
 
   async getEquipmentItemById(id: number): Promise<EqItemResponseDto> {
     if (id <= 0) {
-      throw new Error('Некорректный ID')
+      throw new Error("Некорректный ID");
     }
 
     const item = await prisma.equipmentItem.findUnique({
       where: { id },
       include: {
-        equipmentModel: true
-      }
-    })
+        equipmentModel: true,
+      },
+    });
 
     if (!item) {
-      throw new Error(`Экземпляр оборудования с ID ${id} не найден`)
+      throw new Error(`Экземпляр оборудования с ID ${id} не найден`);
     }
 
-    return EquipmentService.eqItemToResponseDto(item)
+    return EquipmentService.eqItemToResponseDto(item);
   }
 
-  async getEquipmentItemsByModel(equipmentModelId: number): Promise<EqItemResponseDto[]> {
+  async getEquipmentItemsByModel(
+    equipmentModelId: number,
+  ): Promise<EqItemResponseDto[]> {
     const exists = await prisma.equipmentModel.findUnique({
-      where: { id: equipmentModelId }
-    })
+      where: { id: equipmentModelId },
+    });
 
     if (!exists) {
-      throw new Error(`Модель оборудования с ID ${equipmentModelId} не найдена`)
+      throw new Error(
+        `Модель оборудования с ID ${equipmentModelId} не найдена`,
+      );
     }
 
     const items = await prisma.equipmentItem.findMany({
       where: { equipmentModelId },
       include: {
-        equipmentModel: true
-      }
-    })
+        equipmentModel: true,
+      },
+    });
 
     if (items.length === 0) {
-      throw new Error(`Нет экземпляров для модели ${equipmentModelId}`)
+      throw new Error(`Нет экземпляров для модели ${equipmentModelId}`);
     }
 
-    return items.map(i => EquipmentService.eqItemToResponseDto(i))
+    return items.map((i) => EquipmentService.eqItemToResponseDto(i));
   }
 
   async deleteEquipmentItem(id: number): Promise<void> {
     const equipmentItem = await prisma.equipmentItem.findUnique({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!equipmentItem) {
-      throw new Error(`Экземпляр оборудования с ID ${id} не найден`)
+      throw new Error(`Экземпляр оборудования с ID ${id} не найден`);
     }
 
     await prisma.equipmentItem.delete({
-      where: { id }
-    })
+      where: { id },
+    });
   }
 
   async getAvailableEquipmentItemsByModel(
     equipmentModelId: number,
     start: Date,
-    end: Date
+    end: Date,
   ): Promise<EqItemResponseDto[]> {
     if (equipmentModelId <= 0) {
-      throw new Error('Некорректный ID модели')
+      throw new Error("Некорректный ID модели");
     }
 
     if (start >= end) {
-      throw new Error('Дата начала должна быть раньше даты окончания')
+      throw new Error("Дата начала должна быть раньше даты окончания");
     }
 
     const exists = await prisma.equipmentModel.findUnique({
-      where: { id: equipmentModelId }
-    })
+      where: { id: equipmentModelId },
+    });
 
     if (!exists) {
-      throw new Error(`Модель оборудования с ID ${equipmentModelId} не найдена`)
+      throw new Error(
+        `Модель оборудования с ID ${equipmentModelId} не найдена`,
+      );
     }
 
     const items = await prisma.equipmentItem.findMany({
@@ -440,46 +462,46 @@ export class EquipmentService {
               {
                 booking: {
                   status: {
-                    in: [BookingStatus.Pending, BookingStatus.Approved]
-                  }
-                }
+                    in: [BookingStatus.Pending, BookingStatus.Approved],
+                  },
+                },
               },
               {
                 startDate: {
-                  lt: end
-                }
+                  lt: end,
+                },
               },
               {
                 endDate: {
-                  gt: start
-                }
-              }
-            ]
-          }
-        }
+                  gt: start,
+                },
+              },
+            ],
+          },
+        },
       },
       include: {
-        equipmentModel: true
-      }
-    })
+        equipmentModel: true,
+      },
+    });
 
-    return items.map(i => EquipmentService.eqItemToResponseDto(i))
+    return items.map((i) => EquipmentService.eqItemToResponseDto(i));
   }
 
   async toggleAvailability(id: number): Promise<void> {
     const equipmentItem = await prisma.equipmentItem.findUnique({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!equipmentItem) {
-      throw new Error(`Экземпляр оборудования с ID ${id} не найден`)
+      throw new Error(`Экземпляр оборудования с ID ${id} не найден`);
     }
 
     await prisma.equipmentItem.update({
       where: { id },
       data: {
-        available: !equipmentItem.available
-      }
-    })
+        available: !equipmentItem.available,
+      },
+    });
   }
 }
