@@ -13,7 +13,6 @@ interface User {
   login: string;
   name: string;
   role: string;
-  isTelegramLinked: boolean;
 }
 
 interface AuthContextType {
@@ -37,7 +36,7 @@ function decodeJWT(token: string) {
   const jsonPayload = decodeURIComponent(
     atob(base64)
       .split("")
-      .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+      .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
       .join(""),
   );
 
@@ -69,7 +68,6 @@ function mapJwtToUser(payload: Record<string, unknown>): User {
     login,
     name,
     role,
-    isTelegramLinked: Boolean(payload.isTelegramLinked),
   };
 }
 

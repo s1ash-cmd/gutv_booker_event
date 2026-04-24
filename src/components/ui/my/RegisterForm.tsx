@@ -11,29 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { userApi } from "@/lib/userApi";
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [accountType, setAccountType] = useState<"gutv" | "organization">(
-    "gutv",
-  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from(
-    { length: currentYear - 2011 + 1 },
-    (_, i) => currentYear - i,
-  );
 
   const validateForm = (formData: FormData): Record<string, string> => {
     const newErrors: Record<string, string> = {};
@@ -43,7 +27,6 @@ export function RegisterForm() {
     const login = formData.get("login") as string;
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
-    const year = formData.get("year") as string;
 
     if (!firstName || firstName.trim() === "") {
       newErrors.firstName = "Имя не может быть пустым";
@@ -79,10 +62,6 @@ export function RegisterForm() {
       newErrors.confirmPassword = "Пароли не совпадают";
     }
 
-    if (accountType === "gutv" && !year) {
-      newErrors.year = "Выберите год вступления";
-    }
-
     return newErrors;
   };
 
@@ -106,17 +85,11 @@ export function RegisterForm() {
       const name = `${firstName.trim()} ${lastName.trim()}`;
       const login = formData.get("login") as string;
       const password = formData.get("password") as string;
-      const isOrganization = accountType === "organization";
-      const joinYear = isOrganization
-        ? null
-        : parseInt(formData.get("year") as string, 10);
 
       await userApi.create_user({
         login,
         password,
         name,
-        joinYear,
-        isOrganization,
       });
 
       router.push("/login");
@@ -291,74 +264,6 @@ export function RegisterForm() {
                 <p className="text-sm md:text-base lg:text-base text-destructive">
                   {errors.confirmPassword}
                 </p>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="md:text-lg lg:text-lg">
-                  Кто вы? <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={accountType}
-                  onValueChange={(value) => {
-                    setAccountType(value as "gutv" | "organization");
-                    clearError("year");
-                  }}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger className="text-base lg:text-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gutv">Член GUtv</SelectItem>
-                    <SelectItem value="organization">
-                      Представитель организации
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Члены GUtv могут бронировать оборудование. Представители
-                  организаций могут создавать только заявки на event.
-                </p>
-              </div>
-
-              {accountType === "gutv" && (
-                <div className="w-full">
-                <div className="flex items-center">
-                  <Label
-                    htmlFor="year"
-                    className="md:text-lg lg:text-lg"
-                  >
-                    Год вступления в студию
-                    <span className="text-destructive">*</span>
-                  </Label>
-
-                  <Select
-                    name="year"
-                    onValueChange={() => clearError("year")}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger
-                      className={`w-[100px] ml-auto lg:w-[100px] ${errors.year ? "border-destructive" : ""}`}
-                    >
-                      <SelectValue placeholder="" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.map((year) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {errors.year && (
-                  <p className="text-sm md:text-base lg:text-lg text-destructive mt-1 text-right">
-                    {errors.year}
-                  </p>
-                )}
-                </div>
               )}
             </div>
 

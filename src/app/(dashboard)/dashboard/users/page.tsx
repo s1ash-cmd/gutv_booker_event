@@ -10,10 +10,9 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -33,16 +32,24 @@ import {
 import { userApi } from "@/lib/userApi";
 import { cn } from "@/lib/utils";
 
-function isNotFoundError(error: any): boolean {
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  const message = getErrorMessage(error, "");
+  const status = (error as { status?: number })?.status;
+
   return (
-    error?.message?.includes("не найдено") ||
-    error?.message?.includes("не найден") ||
-    error?.status === 404 ||
-    error?.message?.toLowerCase().includes("not found")
+    message.includes("не найдено") ||
+    message.includes("не найден") ||
+    status === 404 ||
+    message.toLowerCase().includes("not found")
   );
 }
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserResponseDto[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserResponseDto[]>([]);
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null);
@@ -51,31 +58,17 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBanStatus, setSelectedBanStatus] = useState<string>("all");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const router = useRouter();
 
-  useEffect(() => {
-    loadCurrentUser();
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, users, selectedBanStatus]);
-
-  async function loadCurrentUser() {
+  const loadCurrentUser = useCallback(async () => {
     try {
       const user = await userApi.get_me();
       setCurrentUser(user);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ошибка загрузки текущего пользователя:", err);
     }
-  }
+  }, []);
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -83,7 +76,7 @@ export default function UsersPage() {
 
       try {
         data = await userApi.get_all();
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         if (isNotFoundError(apiError)) {
           data = [];
         } else {
@@ -93,19 +86,22 @@ export default function UsersPage() {
 
       setUsers(data);
       setFilteredUsers(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ошибка загрузки пользователей:", err);
       setError(
-        err?.message || "Не удалось загрузить пользователей. Попробуйте позже.",
+        getErrorMessage(
+          err,
+          "Не удалось загрузить пользователей. Попробуйте позже.",
+        ),
       );
       setUsers([]);
       setFilteredUsers([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function handleSearch() {
+  const handleSearch = useCallback(() => {
     let filtered = users;
 
     if (selectedBanStatus === "banned") {
@@ -124,11 +120,23 @@ export default function UsersPage() {
     filtered = filtered.filter(
       (u) =>
         u.name.toLowerCase().includes(lowerQuery) ||
-        u.login.toLowerCase().includes(lowerQuery) ||
-        u.telegramUsername?.toLowerCase().includes(lowerQuery),
+        u.login.toLowerCase().includes(lowerQuery),
     );
     setFilteredUsers(filtered);
-  }
+  }, [searchQuery, selectedBanStatus, users]);
+
+  useEffect(() => {
+    void loadCurrentUser();
+    void loadUsers();
+  }, [loadCurrentUser, loadUsers]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [handleSearch]);
 
   async function handleBan(id: number, currentBanStatus: boolean) {
     try {
@@ -139,43 +147,29 @@ export default function UsersPage() {
         await userApi.ban(id);
       }
       await loadUsers();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ошибка при изменении статуса бана:", err);
-      setError(err?.message || "Не удалось изменить статус пользователя");
+      setError(getErrorMessage(err, "Не удалось изменить статус пользователя"));
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleRoleChange(id: number, newRole: "admin" | "user") {
+  async function handleRoleChange(
+    id: number,
+    newRole: "admin" | "organization",
+  ) {
     try {
       setActionLoading(id);
       if (newRole === "admin") {
         await userApi.make_admin(id);
       } else {
-        await userApi.make_user(id);
+        await userApi.make_organization(id);
       }
       await loadUsers();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ошибка при изменении роли:", err);
-      setError(err?.message || "Не удалось изменить роль пользователя");
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleRoninToggle(id: number, currentRoninAccess: boolean) {
-    try {
-      setActionLoading(id);
-      if (currentRoninAccess) {
-        await userApi.make_user(id);
-      } else {
-        await userApi.grant_ronin(id);
-      }
-      await loadUsers();
-    } catch (err: any) {
-      console.error("Ошибка при изменении Ronin доступа:", err);
-      setError(err?.message || "Не удалось изменить Ronin доступ");
+      setError(getErrorMessage(err, "Не удалось изменить роль пользователя"));
     } finally {
       setActionLoading(null);
     }
@@ -192,16 +186,30 @@ export default function UsersPage() {
     return currentUser?.id === userId;
   }
 
-  function hasRoninAccess(role: string): boolean {
-    return role === "Ronin" || role === "Admin";
-  }
-
   function openUser(userId: number) {
     router.push(`/dashboard/users/${userId}`);
   }
 
-  function stopRowNavigation(event: { stopPropagation: () => void }) {
+  function stopRowNavigation(event: React.MouseEvent<HTMLElement>) {
     event.stopPropagation();
+  }
+
+  function handleBanClick(
+    event: React.MouseEvent<HTMLButtonElement>,
+    userId: number,
+    currentBanStatus: boolean,
+  ) {
+    event.stopPropagation();
+    void handleBan(userId, currentBanStatus);
+  }
+
+  function handleRoleButtonClick(
+    event: React.MouseEvent<HTMLButtonElement>,
+    userId: number,
+    newRole: "admin" | "organization",
+  ) {
+    event.stopPropagation();
+    void handleRoleChange(userId, newRole);
   }
 
   const hasActiveFilters = searchQuery || selectedBanStatus !== "all";
@@ -218,7 +226,7 @@ export default function UsersPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Поиск по имени, логину, Telegram..."
+                placeholder="Поиск по имени или логину..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -236,7 +244,7 @@ export default function UsersPage() {
               <SelectContent>
                 <SelectItem value="all">Все</SelectItem>
                 <SelectItem value="active">Активные</SelectItem>
-                <SelectItem value="banned">Забаненные</SelectItem>
+                <SelectItem value="banned">Заблокированные</SelectItem>
               </SelectContent>
             </Select>
 
@@ -262,7 +270,9 @@ export default function UsersPage() {
               )}
               {selectedBanStatus !== "all" && (
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                  {selectedBanStatus === "banned" ? "Забаненные" : "Активные"}
+                  {selectedBanStatus === "banned"
+                    ? "Заблокированные"
+                    : "Активные"}
                 </span>
               )}
             </div>
@@ -331,21 +341,19 @@ export default function UsersPage() {
             <div className="lg:hidden space-y-4">
               {filteredUsers.map((user) => {
                 const isSelf = isCurrentUser(user.id);
-                const roninAccess = hasRoninAccess(user.role);
                 const isAdmin = user.role === "Admin";
 
                 return (
                   <div
                     key={user.id}
-                    className="bg-card border border-border rounded-xl p-4 cursor-pointer"
-                    onClick={() => openUser(user.id)}
+                    className="bg-card border border-border rounded-xl p-4 cursor-pointer transition-colors hover:bg-muted/30"
                   >
                     {user.banned && (
                       <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
                           <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                            Забанен
+                            Заблокирован
                           </p>
                         </div>
                       </div>
@@ -377,59 +385,34 @@ export default function UsersPage() {
                           </p>
                         </div>
                       </div>
-
-                      {user.telegramUsername && (
-                        <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            Telegram
-                          </p>
-                          <a
-                            href={`https://t.me/${user.telegramUsername}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-base font-mono font-semibold text-primary hover:underline"
-                          >
-                            {user.telegramUsername}
-                          </a>
-                        </div>
-                      )}
-
-                      <div className="bg-secondary/30 rounded-lg px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            Доступ Ronin
-                          </p>
-                          <Checkbox
-                            checked={roninAccess}
-                            onCheckedChange={(checked) => {
-                              if (!isSelf && checked !== "indeterminate") {
-                                handleRoninToggle(user.id, roninAccess);
-                              }
-                            }}
-                            onClick={stopRowNavigation}
-                            disabled={isSelf || actionLoading === user.id}
-                          />
-                        </div>
-                      </div>
-
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={() => openUser(user.id)}
+                        className="w-full"
+                      >
+                        Открыть
+                      </Button>
                       {!isSelf && (
-                        <div
-                          className="pt-2 border-t border-border grid grid-cols-2 gap-2"
-                          onClick={stopRowNavigation}
-                        >
+                        <div className="pt-2 border-t border-border grid grid-cols-2 gap-2">
                           <Button
                             size="sm"
                             variant={user.banned ? "default" : "destructive"}
-                            onClick={() => handleBan(user.id, user.banned)}
+                            type="button"
+                            onClick={(event) =>
+                              handleBanClick(event, user.id, user.banned)
+                            }
                             disabled={actionLoading === user.id}
                             className="w-full"
+                            onMouseDownCapture={stopRowNavigation}
                           >
                             {actionLoading === user.id ? (
                               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             ) : (
                               <>
                                 <Ban className="w-3 h-3 mr-1" />
-                                {user.banned ? "Разбанить" : "Забанить"}
+                                {user.banned ? "Разбанить" : "Заблокировать"}
                               </>
                             )}
                           </Button>
@@ -438,9 +421,13 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleRoleChange(user.id, "admin")}
+                              type="button"
+                              onClick={(event) =>
+                                handleRoleButtonClick(event, user.id, "admin")
+                              }
                               disabled={actionLoading === user.id}
                               className="w-full"
+                              onMouseDownCapture={stopRowNavigation}
                             >
                               <Shield className="w-3 h-3 mr-1" />
                               Админ
@@ -449,12 +436,20 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleRoleChange(user.id, "user")}
+                              type="button"
+                              onClick={(event) =>
+                                handleRoleButtonClick(
+                                  event,
+                                  user.id,
+                                  "organization",
+                                )
+                              }
                               disabled={actionLoading === user.id}
                               className="w-full"
+                              onMouseDownCapture={stopRowNavigation}
                             >
                               <UserIcon className="w-3 h-3 mr-1" />
-                              Снять админа
+                              Обычный доступ
                             </Button>
                           )}
                         </div>
@@ -471,24 +466,19 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>Имя</TableHead>
                     <TableHead>Логин</TableHead>
-                    <TableHead>Telegram</TableHead>
                     <TableHead className="w-[100px]">Статус</TableHead>
-                    <TableHead className="w-[120px] text-center">
-                      Ronin
-                    </TableHead>
-                    <TableHead className="w-[360px]">Действия</TableHead>
+                    <TableHead className="w-[380px]">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => {
                     const isSelf = isCurrentUser(user.id);
-                    const roninAccess = hasRoninAccess(user.role);
                     const isAdmin = user.role === "Admin";
 
                     return (
                       <TableRow
                         key={user.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="hover:bg-muted/50 cursor-pointer"
                         onClick={() => openUser(user.id)}
                       >
                         <TableCell>
@@ -514,76 +504,49 @@ export default function UsersPage() {
                           @{user.login}
                         </TableCell>
                         <TableCell>
-                          {user.telegramUsername ? (
-                            <a
-                              href={`https://t.me/${user.telegramUsername}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-base font-mono font-semibold text-primary hover:underline"
-                            >
-                              {user.telegramUsername}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
                           {user.banned ? (
                             <div className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
                               <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
                               <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                Забанен
+                                Заблокирован
                               </span>
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
                               <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                                Без бана
+                                Без блокировки
                               </span>
                             </div>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex justify-center">
-                            <Checkbox
-                              checked={roninAccess}
-                              onCheckedChange={(checked) => {
-                                if (!isSelf && checked !== "indeterminate") {
-                                  handleRoninToggle(user.id, roninAccess);
-                                }
-                              }}
-                              onClick={stopRowNavigation}
-                              disabled={isSelf || actionLoading === user.id}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-normal">
                           {isSelf ? (
-                            <div className="text-sm text-muted-foreground italic text-right">
+                            <div className="max-w-[320px] text-sm text-muted-foreground italic text-right leading-5">
                               Вы не можете изменять свой аккаунт
                             </div>
                           ) : (
-                            <div
-                              className="grid grid-cols-2 gap-3"
-                              onClick={stopRowNavigation}
-                            >
+                            <div className="grid min-w-[340px] grid-cols-2 gap-3">
                               <Button
                                 size="sm"
                                 variant={
                                   user.banned ? "default" : "destructive"
                                 }
-                                onClick={() => handleBan(user.id, user.banned)}
+                                type="button"
+                                onClick={(event) =>
+                                  handleBanClick(event, user.id, user.banned)
+                                }
                                 disabled={actionLoading === user.id}
-                                className="w-full"
+                                className="w-full whitespace-nowrap"
+                                onMouseDownCapture={stopRowNavigation}
                               >
                                 {actionLoading === user.id ? (
                                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                 ) : (
                                   <>
                                     <Ban className="w-3 h-3 mr-1" />
-                                    {user.banned ? "Разбанить" : "Забанить"}
+                                    {user.banned
+                                      ? "Разбанить"
+                                      : "Заблокировать"}
                                   </>
                                 )}
                               </Button>
@@ -592,11 +555,17 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() =>
-                                    handleRoleChange(user.id, "admin")
+                                  type="button"
+                                  onClick={(event) =>
+                                    handleRoleButtonClick(
+                                      event,
+                                      user.id,
+                                      "admin",
+                                    )
                                   }
                                   disabled={actionLoading === user.id}
-                                  className="w-full"
+                                  className="w-full whitespace-nowrap"
+                                  onMouseDownCapture={stopRowNavigation}
                                 >
                                   <Shield className="w-3 h-3 mr-1" />
                                   Сделать админом
@@ -605,14 +574,20 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() =>
-                                    handleRoleChange(user.id, "user")
+                                  type="button"
+                                  onClick={(event) =>
+                                    handleRoleButtonClick(
+                                      event,
+                                      user.id,
+                                      "organization",
+                                    )
                                   }
                                   disabled={actionLoading === user.id}
-                                  className="w-full"
+                                  className="w-full whitespace-nowrap"
+                                  onMouseDownCapture={stopRowNavigation}
                                 >
                                   <UserIcon className="w-3 h-3 mr-1" />
-                                  Снять админа
+                                  Обычный доступ
                                 </Button>
                               )}
                             </div>

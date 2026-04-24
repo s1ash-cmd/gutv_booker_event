@@ -1,7 +1,6 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import type { LoginRequest } from "@/app/models/auth/auth";
-import { UserRole } from "@/app/models/user/user";
 import { authService } from "@/lib/auth";
 import { UserService } from "@/services/userService";
 
@@ -37,14 +36,6 @@ export async function POST(request: NextRequest) {
         { error: "Пользователь заблокирован" },
         { status: 401 },
       );
-    }
-
-    if (
-      user.role === UserRole.User &&
-      user.joinYear + 1 <= new Date().getFullYear()
-    ) {
-      user.role = UserRole.Osnova;
-      await userService.updateUser(user);
     }
 
     const accessToken = await authService.generateAccessToken(user);

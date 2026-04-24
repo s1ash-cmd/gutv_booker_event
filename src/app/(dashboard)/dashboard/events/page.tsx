@@ -10,8 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { BookingStatus } from "@/app/models/booking/booking";
+import { useCallback, useEffect, useState } from "react";
 import type { EventResponseDto } from "@/app/models/event/event";
 import { AdminOnly } from "@/components/AdminOnly";
 import { Button } from "@/components/ui/button";
@@ -49,21 +48,20 @@ const statusColors: Record<string, string> = {
   Completed: "bg-blue-500",
 };
 
-const statusFilterMap: Record<string, BookingStatus> = {
-  Pending: BookingStatus.Pending,
-  Cancelled: BookingStatus.Cancelled,
-  Approved: BookingStatus.Approved,
-  Completed: BookingStatus.Completed,
-};
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
-function isNotFoundError(error: any): boolean {
-  const message = String(error?.message ?? "").toLowerCase();
+function isNotFoundError(error: unknown): boolean {
+  const message = getErrorMessage(error, "").toLowerCase();
+  const status = (error as { status?: number })?.status;
+
   return (
     message.includes("не найдено") ||
     message.includes("не найден") ||
     message.includes("нет событий") ||
     message.includes("no events") ||
-    error?.status === 404 ||
+    status === 404 ||
     message.includes("not found")
   );
 }
@@ -77,49 +75,7 @@ export default function EventsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
-  useEffect(() => {
-    setSelectedStatus("Pending");
-  }, []);
-
-  useEffect(() => {
-    void loadEvents();
-  }, [selectedStatus]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, events]);
-
-  async function loadEvents() {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const data =
-        selectedStatus === "all"
-          ? await eventApi.get_all()
-          : await eventApi.get_by_status(statusFilterMap[selectedStatus]);
-
-      setEvents(data);
-      setFilteredEvents(data);
-    } catch (loadError: any) {
-      console.error("Ошибка загрузки event заявок:", loadError);
-      setEvents([]);
-      setFilteredEvents([]);
-      setError(
-        isNotFoundError(loadError)
-          ? null
-          : loadError?.message || "Не удалось загрузить event заявки",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleSearch() {
+  const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) {
       setFilteredEvents(events);
       return;
@@ -145,7 +101,49 @@ export default function EventsDashboardPage() {
     );
 
     setFilteredEvents(filtered);
-  }
+  }, [events, searchQuery]);
+
+  const loadEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const data =
+        selectedStatus === "all"
+          ? await eventApi.get_all()
+          : await eventApi.get_by_status(selectedStatus);
+
+      setEvents(data);
+      setFilteredEvents(data);
+    } catch (loadError: unknown) {
+      console.error("Ошибка загрузки заявок:", loadError);
+      setEvents([]);
+      setFilteredEvents([]);
+      setError(
+        isNotFoundError(loadError)
+          ? null
+          : getErrorMessage(loadError, "Не удалось загрузить заявки"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedStatus]);
+
+  useEffect(() => {
+    setSelectedStatus("Pending");
+  }, []);
+
+  useEffect(() => {
+    void loadEvents();
+  }, [loadEvents]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [handleSearch]);
 
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
@@ -170,14 +168,7 @@ export default function EventsDashboardPage() {
       <main className="bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">
-                Заявки на event
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Просмотр заявок, созданных через форму event
-              </p>
-            </div>
+            <h1 className="text-2xl md:text-3xl font-bold">Все заявки</h1>
           </div>
 
           <div className="bg-card/50 backdrop-blur border border-border rounded-xl p-4">
@@ -224,8 +215,8 @@ export default function EventsDashboardPage() {
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                 {searchQuery && (
                   <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                    {/^\d+$/.test(searchQuery.trim()) ? "ID: " : "Поиск: "}"
-                    {searchQuery}"
+                    {/^\d+$/.test(searchQuery.trim()) ? "ID: " : "Поиск: "}
+                    {searchQuery}
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
@@ -279,8 +270,8 @@ export default function EventsDashboardPage() {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   {hasActiveFilters
-                    ? "Попробуйте изменить фильтр по статусу"
-                    : "В данный момент нет заявок на event"}
+                    ? "Попробуйте изменить параметры поиска или фильтры"
+                    : "В данный момент нет заявок"}
                 </p>
                 {hasActiveFilters && (
                   <Button variant="outline" onClick={clearFilters}>
@@ -293,10 +284,11 @@ export default function EventsDashboardPage() {
             <>
               <div className="md:hidden space-y-4">
                 {filteredEvents.map((event) => (
-                  <div
+                  <button
                     key={event.id}
+                    type="button"
                     onClick={() => router.push(`/dashboard/events/${event.id}`)}
-                    className="bg-card border border-border rounded-xl p-4"
+                    className="w-full text-left bg-card border border-border rounded-xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -395,7 +387,7 @@ export default function EventsDashboardPage() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 

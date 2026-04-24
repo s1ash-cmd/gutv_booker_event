@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { UserRole } from "@/app/models/user/user";
 import { authService } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function getUserFromToken(request: NextRequest) {
   const token = request.headers.get("authorization")?.split(" ")[1];
@@ -11,22 +12,34 @@ export async function getUserFromToken(request: NextRequest) {
 
   try {
     const payload = await authService.verifyToken(token);
+    const userId = Number.parseInt(String(payload.sub ?? ""), 10);
 
-    // Convert role string back to enum for legacy compatibility
-    const roleString = payload.role as string;
-    const roleEnum = UserRole[
-      roleString as keyof typeof UserRole
-    ] as unknown as number;
+    if (!Number.isFinite(userId) || userId <= 0) {
+      throw new Error("Invalid token");
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!currentUser) {
+      throw new Error("Unauthorized");
+    }
+
+    const roleName = UserRole[currentUser.role];
 
     return {
-      id: parseInt(payload.sub, 10),
-      role: roleEnum,
-      roleName: roleString,
-      login: payload.login,
-      name: payload.name,
+      id: currentUser.id,
+      role: currentUser.role,
+      roleName,
+      login: currentUser.login,
+      name: currentUser.name,
     };
-  } catch (error: any) {
-    console.error("Token verification error:", error.message || error);
+  } catch (error: unknown) {
+    console.error(
+      "Token verification error:",
+      error instanceof Error ? error.message : error,
+    );
     throw new Error("Invalid token");
   }
 }
@@ -48,7 +61,7 @@ export async function isAdmin(request: NextRequest): Promise<boolean> {
 }
 
 export function requireRole(userRole: number, requiredRole: UserRole) {
-  if (userRole < requiredRole) {
+  if (userRole !== requiredRole) {
     throw new Error("Forbidden");
   }
 }

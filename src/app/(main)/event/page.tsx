@@ -11,10 +11,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { eventApi } from "@/lib/eventApi";
 import { canCreateEvent } from "@/lib/roles";
 
+const eventStatusLabels: Record<string, string> = {
+  Pending: "На рассмотрении",
+  Approved: "Одобрена",
+  Cancelled: "Отменена",
+  Completed: "Завершена",
+};
+
 export default function EventPage() {
   const router = useRouter();
   const { user, isAuth, isLoading: isAuthLoading } = useAuth();
-  const [client, setClient] = useState("");
   const [reason, setReason] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -27,13 +33,17 @@ export default function EventPage() {
     return new Date(datetimeLocal).toISOString();
   }
 
+  function getStatusLabel(status: string) {
+    return eventStatusLabels[status] ?? "Принята";
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
 
-    if (!client.trim() || !reason.trim() || !startTime || !endTime) {
-      setError("Заполните клиента, причину и даты события");
+    if (!reason.trim() || !startTime || !endTime) {
+      setError("Заполните причину и даты события");
       return;
     }
 
@@ -45,7 +55,6 @@ export default function EventPage() {
     try {
       setLoading(true);
       const event = await eventApi.create_event({
-        client: client.trim(),
         reason: reason.trim(),
         startTime: convertToISO(startTime),
         endTime: convertToISO(endTime),
@@ -53,9 +62,8 @@ export default function EventPage() {
       });
 
       setSuccessMessage(
-        `Заявка на мероприятие #${event.id} создана. Статус: ${event.status}.`,
+        `Заявка №${event.id} успешно отправлена. Текущий статус: ${getStatusLabel(event.status)}.`,
       );
-      setClient("");
       setReason("");
       setStartTime("");
       setEndTime("");
@@ -104,8 +112,8 @@ export default function EventPage() {
 
           <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
             <p className="text-muted-foreground">
-              Чтобы создать заявку на event, войдите в аккаунт представителя
-              организации.
+              Чтобы создать заявку на съемку мероприятия, войдите в аккаунт
+              представителя организации.
             </p>
             <Button onClick={() => router.push("/login")}>Войти</Button>
           </div>
@@ -134,11 +142,11 @@ export default function EventPage() {
 
           <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
             <p className="text-muted-foreground">
-              Для членов GUtv эта форма недоступна. Для вас доступно
-              бронирование оборудования.
+              Для членов GUtv эта форма недоступна. Только представители
+              организаций и администраторы могут создавать event-заявки.
             </p>
             <Button onClick={() => router.push("/")}>
-              Перейти к каталогу оборудования
+              Вернуться на главную
             </Button>
           </div>
         </div>
@@ -174,21 +182,13 @@ export default function EventPage() {
           )}
 
           {successMessage && (
-            <div className="text-sm text-green-700 bg-green-500/10 p-3 rounded-md border border-green-500/20 dark:text-green-300">
-              {successMessage}
+            <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-green-800 dark:text-green-200">
+              <p className="text-sm font-semibold">Заявка отправлена</p>
+              <p className="mt-1 text-sm text-green-700/90 dark:text-green-200/90">
+                {successMessage}
+              </p>
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="client">Клиент</Label>
-            <Input
-              id="client"
-              value={client}
-              onChange={(e) => setClient(e.target.value)}
-              placeholder="Название клиента или проекта"
-              disabled={loading}
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="reason">Причина / описание</Label>
@@ -240,7 +240,7 @@ export default function EventPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Button type="submit" disabled={loading}>
               <CalendarPlus className="w-4 h-4 mr-2" />
-              {loading ? "Отправка..." : "Забронировать мероприятие"}
+              {loading ? "Отправка..." : "Отправить заявку"}
             </Button>
             <Button
               type="button"
@@ -248,7 +248,7 @@ export default function EventPage() {
               onClick={() => router.push("/")}
               disabled={loading}
             >
-              Вернуться к каталогу
+              Вернуться на главную
             </Button>
           </div>
         </form>

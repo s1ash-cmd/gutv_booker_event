@@ -1,24 +1,26 @@
-import { withAccelerate } from "@prisma/extension-accelerate";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "@/generated/prisma/client";
 
 declare global {
-  var prisma: ReturnType<typeof createPrismaClient> | undefined;
+  var __prisma: PrismaClient | undefined;
 }
 
 function createPrismaClient() {
-  const accelerateUrl = process.env.PRISMA_DATABASE_URL;
+  const databaseUrl = process.env.DATABASE_URL;
 
-  if (!accelerateUrl) {
+  if (!databaseUrl) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  return new PrismaClient({
-    accelerateUrl,
-  }).$extends(withAccelerate());
+  const adapter = new PrismaBetterSqlite3({
+    url: databaseUrl,
+  });
+
+  return new PrismaClient({ adapter });
 }
 
-export const prisma = global.prisma ?? createPrismaClient();
+export const prisma = globalThis.__prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
-  global.prisma = prisma;
+  globalThis.__prisma = prisma;
 }

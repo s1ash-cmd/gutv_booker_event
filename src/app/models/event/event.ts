@@ -1,5 +1,4 @@
 export interface CreateEventRequestDto {
-  client: string;
   reason: string;
   startTime: string;
   endTime: string;

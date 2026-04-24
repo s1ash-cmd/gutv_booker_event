@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import {
   type CreateUserRequestDto,
   type UserResponseDto,
@@ -14,16 +14,14 @@ export class UserService {
       .createHash("sha256")
       .update(request.password + salt)
       .digest("base64");
+    const normalizedLogin = request.login.trim().toLowerCase();
 
     return {
-      login: request.login,
+      login: normalizedLogin,
       passwordHash,
       salt,
       name: request.name,
-      role: request.isOrganization ? UserRole.Organization : UserRole.User,
-      joinYear: request.joinYear ?? 0,
-      telegramChatId: null,
-      telegramUsername: null,
+      role: UserRole.Organization,
       banned: false,
     };
   }
@@ -33,11 +31,6 @@ export class UserService {
       id: user.id,
       name: user.name,
       login: user.login,
-      telegramChatId: user.telegramChatId
-        ? user.telegramChatId.toString()
-        : null,
-      telegramUsername: user.telegramUsername,
-      isTelegramLinked: user.telegramChatId !== null,
       role: UserRole[user.role],
       banned: user.banned,
     };
@@ -65,11 +58,12 @@ export class UserService {
   }
 
   async getByLogin(login: string): Promise<User | null> {
+    const normalizedLogin = login.trim().toLowerCase();
+
     return await prisma.user.findFirst({
       where: {
         login: {
-          equals: login,
-          mode: "insensitive",
+          equals: normalizedLogin,
         },
       },
     });
@@ -83,11 +77,12 @@ export class UserService {
   }
 
   async createUser(request: CreateUserRequestDto): Promise<UserResponseDto> {
+    const normalizedLogin = request.login.trim().toLowerCase();
+
     const existingUser = await prisma.user.findFirst({
       where: {
         login: {
-          equals: request.login,
-          mode: "insensitive",
+          equals: normalizedLogin,
         },
       },
     });
@@ -97,11 +92,6 @@ export class UserService {
     }
 
     const userData = await this.createDtoToUser(request);
-
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      userData.role = UserRole.Admin;
-    }
 
     const user = await prisma.user.create({ data: userData });
 
@@ -121,141 +111,14 @@ export class UserService {
   }
 
   async getUsersByName(namePart: string): Promise<UserResponseDto[] | null> {
-    const users = await prisma.user.findMany({
-      where: {
-        name: {
-          contains: namePart,
-          mode: "insensitive",
-        },
-      },
-    });
-    return users.length > 0 ? users.map(UserService.userToResponseDto) : null;
-  }
-
-  async getUserByTelegramChatId(chatId: bigint): Promise<User | null> {
-    return await prisma.user.findFirst({
-      where: { telegramChatId: chatId },
-    });
-  }
-
-  async generateTelegramLinkCode(userId: number): Promise<string> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new Error("Пользователь не найден");
-    }
-
-    if (user.telegramChatId) {
-      throw new Error("Telegram уже привязан к вашему аккаунту");
-    }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        telegramLinkCode: code,
-        telegramLinkCodeExpiry: new Date(Date.now() + 10 * 60 * 1000),
-      },
-    });
-
-    return code;
-  }
-
-  async linkTelegramByCode(
-    code: string,
-    chatId: bigint,
-    username: string | null,
-  ): Promise<User> {
-    const user = await prisma.user.findFirst({
-      where: { telegramLinkCode: code },
-    });
-
-    if (!user) {
-      throw new Error("Неверный код привязки");
-    }
-
-    if (
-      !user.telegramLinkCodeExpiry ||
-      user.telegramLinkCodeExpiry < new Date()
-    ) {
-      throw new Error(
-        "Срок действия кода истек. Сгенерируйте новый код в личном кабинете",
-      );
-    }
-
-    const existingLink = await prisma.user.findFirst({
-      where: { telegramChatId: chatId },
-    });
-
-    if (existingLink) {
-      if (existingLink.id === user.id) {
-        throw new Error("Этот Telegram уже привязан к вашему аккаунту");
-      } else {
-        throw new Error(
-          "Этот Telegram уже привязан к другому аккаунту. Обратитесь к администратору",
-        );
-      }
-    }
-
-    return await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        telegramChatId: chatId,
-        telegramUsername: username,
-        telegramLinkCode: null,
-        telegramLinkCodeExpiry: null,
-      },
-    });
-  }
-
-  async unlinkTelegram(userId: number): Promise<boolean> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new Error("Пользователь не найден");
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        telegramChatId: null,
-        telegramUsername: null,
-        telegramLinkCode: null,
-        telegramLinkCodeExpiry: null,
-      },
-    });
-
-    return true;
-  }
-
-  async updateTelegramUsername(chatId: bigint, newUsername: string | null) {
-    const user = await prisma.user.findFirst({
-      where: { telegramChatId: chatId },
-    });
-
-    if (user && user.telegramUsername !== newUsername) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { telegramUsername: newUsername },
-      });
-    }
-  }
-
-  generateTelegramDeepLink(code: string, botUsername: string): string {
-    botUsername = botUsername.replace(/^@/, "");
-    return `https://t.me/${botUsername}?start=LINK_${code}`;
-  }
-
-  async getUserByRole(role: UserRole): Promise<UserResponseDto[] | null> {
-    const users = await prisma.user.findMany({
-      where: { role },
-    });
-    return users.length > 0 ? users.map(UserService.userToResponseDto) : null;
+    const normalizedNamePart = namePart.trim().toLowerCase();
+    const users = await prisma.user.findMany();
+    const matchedUsers = users.filter((user) =>
+      user.name.toLowerCase().includes(normalizedNamePart),
+    );
+    return matchedUsers.length > 0
+      ? matchedUsers.map(UserService.userToResponseDto)
+      : null;
   }
 
   async banUser(userId: number): Promise<boolean> {
@@ -291,24 +154,13 @@ export class UserService {
     return true;
   }
 
-  async grantRonin(userId: number): Promise<boolean> {
+  async makeOrganization(userId: number): Promise<boolean> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return false;
 
     await prisma.user.update({
       where: { id: userId },
-      data: { role: UserRole.Ronin },
-    });
-    return true;
-  }
-
-  async makeUser(userId: number): Promise<boolean> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return false;
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: UserRole.User },
+      data: { role: UserRole.Organization },
     });
     return true;
   }

@@ -8,19 +8,14 @@ import {
   LogOut,
   Menu,
   Moon,
-  Package,
-  Settings,
-  ShoppingCart,
   SquareTerminal,
   Sun,
-  User,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useState } from "react";
-
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -29,7 +24,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -44,12 +38,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvatarUrl } from "@/lib/avatar";
-import {
-  canBookEquipment,
-  canCreateEvent,
-  isAdminRole,
-  isOrganizationRole,
-} from "@/lib/roles";
+import { canCreateEvent, isAdminRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 export function Header() {
@@ -57,19 +46,6 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const { user, isAuth, logout, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const getInitials = (login: string) => {
-    return login.substring(0, 1).toUpperCase();
-  };
-
-  const handleLogout = () => {
-    logout();
-    setMobileMenuOpen(false);
-  };
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
 
   if (isLoading) {
     return (
@@ -82,23 +58,25 @@ export function Header() {
   }
 
   const isAdmin = isAdminRole(user?.role);
-  const isOrganization = isOrganizationRole(user?.role);
   const canOpenEvent = canCreateEvent(user?.role);
-  const canOpenCart = canBookEquipment(user?.role);
-  const personalDashboardHref = isOrganization
-    ? "/dashboard/events/my"
-    : "/dashboard/bookings/my";
-  const personalDashboardLabel = isOrganization
-    ? "Мои заявки"
-    : "Мои бронирования";
+  const personalDashboardHref = "/dashboard/events/my";
+  const personalDashboardLabel = "Мои заявки";
+
   const navItems = [
     { name: "Главная", href: "/", icon: Home },
     ...(canOpenEvent
-      ? [{ name: "Мероприятия", href: "/event", icon: CalendarPlus }]
+      ? [{ name: "Создать заявку", href: "/event", icon: CalendarPlus }]
       : []),
     { name: "Правила", href: "/rules", icon: BookOpen },
     { name: "Контакты", href: "/contacts", icon: BookUser },
   ];
+
+  const getInitials = (login: string) => login.substring(0, 1).toUpperCase();
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+  const handleLogout = () => {
+    logout();
+    setMobileMenuOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/30 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
@@ -196,7 +174,7 @@ export function Header() {
                       <div className="space-y-1">
                         {isAdmin && (
                           <Link
-                            href="/dashboard/"
+                            href="/dashboard"
                             onClick={closeMobileMenu}
                             className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all duration-200"
                           >
@@ -211,16 +189,10 @@ export function Header() {
                           onClick={closeMobileMenu}
                           className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200"
                         >
-                          <Package className="w-4 h-4 ml-2 shrink-0" />
-                          <span className="text-sm">{personalDashboardLabel}</span>
-                        </Link>
-                        <Link
-                          href="/dashboard/settings"
-                          onClick={closeMobileMenu}
-                          className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200"
-                        >
-                          <Settings className="w-4 h-4 ml-2 shrink-0" />
-                          <span className="text-sm">Настройки</span>
+                          <CalendarPlus className="w-4 h-4 ml-2 shrink-0" />
+                          <span className="text-sm">
+                            {personalDashboardLabel}
+                          </span>
                         </Link>
                       </div>
                     </div>
@@ -228,7 +200,7 @@ export function Header() {
 
                   <div className="p-3 border-t border-border/30 bg-gradient-to-t from-background/60 to-transparent space-y-3">
                     <Link
-                      href="/dashboard/profile"
+                      href={personalDashboardHref}
                       onClick={closeMobileMenu}
                       className="relative block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     >
@@ -413,6 +385,7 @@ export function Header() {
               </SheetContent>
             </Sheet>
           )}
+
           <Link href="/" className="flex items-center space-x-2">
             <div className="relative w-8 h-8">
               <Image
@@ -429,7 +402,7 @@ export function Header() {
               />
             </div>
             <span className="font-bold inline-block text-foreground">
-              GUtv booker
+              ГУтв Заявки
             </span>
           </Link>
 
@@ -452,20 +425,6 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          {canOpenCart && (
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="relative hover:bg-secondary/50"
-              aria-label="Перейти к корзине"
-            >
-              <Link href="/cart">
-                <ShoppingCart className="h-[1.1rem] w-[1.1rem]" />
-              </Link>
-            </Button>
-          )}
-
           <Button
             variant="ghost"
             size="icon"
@@ -507,7 +466,7 @@ export function Header() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuItem asChild className="cursor-pointer">
                     <Link
-                      href="/dashboard/profile"
+                      href={personalDashboardHref}
                       className="flex flex-col items-start space-y-1 py-2"
                     >
                       <div className="flex items-center gap-2">
@@ -527,12 +486,11 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-
                   {isAdmin && (
                     <>
                       <DropdownMenuItem asChild>
                         <Link
-                          href="/dashboard/"
+                          href="/dashboard"
                           className="cursor-pointer text-blue-600 focus:text-blue-600 focus:bg-blue-50 dark:focus:bg-blue-950/20"
                         >
                           <SquareTerminal className="mr-2 h-4 w-4" />
@@ -544,20 +502,13 @@ export function Header() {
                       <DropdownMenuSeparator />
                     </>
                   )}
-
                   <DropdownMenuItem asChild>
                     <Link
                       href={personalDashboardHref}
                       className="cursor-pointer"
                     >
-                      <Package className="mr-2 h-4 w-4" />
+                      <CalendarPlus className="mr-2 h-4 w-4" />
                       <span>{personalDashboardLabel}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Настройки</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -572,20 +523,14 @@ export function Header() {
               </DropdownMenu>
             </div>
           ) : (
-            <>
-              <div className="hidden sm:flex items-center gap-2 ml-2">
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="hover:bg-secondary/50"
-                >
-                  <Link href="/login">Войти</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/register">Регистрация</Link>
-                </Button>
-              </div>
-            </>
+            <div className="hidden sm:flex items-center gap-2 ml-2">
+              <Button variant="ghost" asChild className="hover:bg-secondary/50">
+                <Link href="/login">Войти</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/register">Регистрация</Link>
+              </Button>
+            </div>
           )}
         </div>
       </div>

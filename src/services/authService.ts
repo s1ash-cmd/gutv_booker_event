@@ -1,5 +1,5 @@
-import crypto from "crypto";
-import { jwtVerify, SignJWT } from "jose";
+import crypto from "node:crypto";
+import { type JWTPayload, jwtVerify, SignJWT } from "jose";
 import type { AuthSettings } from "@/app/models/auth/auth";
 import { UserRole } from "@/app/models/user/user";
 import type { User } from "@/generated/prisma/client";
@@ -24,7 +24,6 @@ export class AuthService {
       name: user.name,
       login: user.login,
       role: roleName,
-      isTelegramLinked: !!user.telegramChatId,
     })
 
       .setProtectedHeader({ alg: "HS256" })
@@ -42,14 +41,14 @@ export class AuthService {
     return randomBytes.toString("base64");
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<JWTPayload> {
     try {
       const { payload } = await jwtVerify(token, this.secret, {
         issuer: this.settings.issuer,
         audience: this.settings.audience,
       });
       return payload;
-    } catch (error) {
+    } catch {
       throw new Error("Invalid token");
     }
   }

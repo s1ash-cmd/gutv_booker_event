@@ -1,22 +1,13 @@
 "use client";
 
-import {
-  Calendar,
-  LogOut,
-  Moon,
-  Package,
-  Settings,
-  Sun,
-  Users,
-} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Calendar, LogOut, Moon, Sun, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-
 import LogoDark from "@/assets/favicon-dark.svg";
 import LogoLight from "@/assets/favicon-light.svg";
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -33,13 +24,10 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvatarUrl } from "@/lib/avatar";
-import { isOrganizationRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const adminMenuItems = [
-  { title: "Все бронирования", icon: Calendar, href: "/dashboard/bookings" },
-  { title: "Заявки на event", icon: Calendar, href: "/dashboard/events" },
-  { title: "Оборудование", icon: Package, href: "/dashboard/equipment" },
+  { title: "Все заявки", icon: Calendar, href: "/dashboard/events" },
   { title: "Пользователи", icon: Users, href: "/dashboard/users" },
 ];
 
@@ -48,24 +36,25 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const getInitials = (login: string) => {
-    return login.substring(0, 1).toUpperCase();
-  };
-
   if (!user) return null;
 
   const isAdmin = user.role === "Admin";
-  const isOrganization = isOrganizationRole(user.role);
+  const profileHref = "/dashboard/events/my";
   const mainMenuItems = [
     {
-      title: isOrganization ? "Мои заявки" : "Мои бронирования",
-      icon: Package,
-      href: isOrganization ? "/dashboard/events/my" : "/dashboard/bookings/my",
+      title: "Мои заявки",
+      icon: Calendar,
+      href: profileHref,
     },
-    { title: "Настройки", icon: Settings, href: "/dashboard/settings" },
   ];
 
-  const renderMenuItem = (item: { title: string; icon: any; href: string }) => {
+  const getInitials = (login: string) => login.substring(0, 1).toUpperCase();
+
+  const renderMenuItem = (item: {
+    title: string;
+    icon: LucideIcon;
+    href: string;
+  }) => {
     const isActive = pathname === item.href;
     return (
       <SidebarMenuItem key={item.href}>
@@ -82,7 +71,6 @@ export function AppSidebar() {
             {isActive && (
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
             )}
-
             <item.icon
               className={cn(
                 "w-4 h-4 ml-2 transition-colors",
@@ -122,7 +110,7 @@ export function AppSidebar() {
               </div>
               <div>
                 <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  GUtv Booker
+                  ГУтв Заявки
                 </h2>
               </div>
             </Link>
@@ -156,11 +144,10 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-3 border-t border-border/30 bg-gradient-to-t from-background/60 to-transparent space-y-3">
         <Link
-          href="/dashboard/profile"
+          href={profileHref}
           className="relative block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-purple-500/10 to-primary/10 rounded-xl blur-sm opacity-50"></div>
-
           <div className="relative flex items-center gap-3 px-3 py-3 bg-card/50 backdrop-blur border border-border/50 rounded-xl transition-colors hover:bg-card/70">
             <div className="relative shrink-0">
               {isAdmin && (
@@ -181,7 +168,6 @@ export function AppSidebar() {
                 </AvatarFallback>
               </Avatar>
             </div>
-
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-foreground truncate">

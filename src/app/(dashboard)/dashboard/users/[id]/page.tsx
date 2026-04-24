@@ -6,20 +6,17 @@ import {
   ChevronLeft,
   Clock,
   MessageSquare,
-  Send,
-  Shield,
-  User as UserIcon,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { BookingResponseDto } from "@/app/models/booking/booking";
+import { useCallback, useEffect, useState } from "react";
+import type { EventResponseDto } from "@/app/models/event/event";
 import type { UserResponseDto } from "@/app/models/user/user";
 import { AdminOnly } from "@/components/AdminOnly";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getAvatarUrl } from "@/lib/avatar";
-import { bookingApi } from "@/lib/bookingApi";
-import { getRoleLabel, hasRoninAccess } from "@/lib/roles";
+import { eventApi } from "@/lib/eventApi";
+import { getRoleLabel } from "@/lib/roles";
 import { userApi } from "@/lib/userApi";
 import { cn } from "@/lib/utils";
 
@@ -46,11 +43,15 @@ function isNotFoundError(error: unknown): boolean {
   return (
     message.includes("не найдено") ||
     message.includes("не найден") ||
-    message.includes("нет бронирований") ||
-    message.includes("no bookings") ||
+    message.includes("нет событий") ||
+    message.includes("нет заявок") ||
     status === 404 ||
     message.includes("not found")
   );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export default function UserDetailPage() {
@@ -59,51 +60,50 @@ export default function UserDetailPage() {
   const userId = Number.parseInt(params.id as string, 10);
 
   const [user, setUser] = useState<UserResponseDto | null>(null);
-  const [bookings, setBookings] = useState<BookingResponseDto[]>([]);
+  const [events, setEvents] = useState<EventResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (Number.isFinite(userId)) {
-      void loadData();
-    }
-  }, [userId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const userPromise = userApi.get_by_id(userId);
-      const bookingsPromise = bookingApi
-        .get_by_user(userId)
-        .catch((loadError) => {
-          if (isNotFoundError(loadError)) {
-            return [];
-          }
+      const eventsPromise = eventApi.get_by_user(userId).catch((loadError) => {
+        if (isNotFoundError(loadError)) {
+          return [];
+        }
 
-          throw loadError;
-        });
+        throw loadError;
+      });
 
-      const [userData, bookingsData] = await Promise.all([
+      const [userData, eventsData] = await Promise.all([
         userPromise,
-        bookingsPromise,
+        eventsPromise,
       ]);
+
       setUser(userData);
-      setBookings(
-        [...bookingsData].sort(
+      setEvents(
+        [...eventsData].sort(
           (left, right) =>
             new Date(right.creationTime).getTime() -
             new Date(left.creationTime).getTime(),
         ),
       );
-    } catch (loadError: any) {
+    } catch (loadError: unknown) {
       console.error("Ошибка загрузки пользователя:", loadError);
-      setError(loadError?.message || "Не удалось загрузить пользователя");
+      setError(getErrorMessage(loadError, "Не удалось загрузить пользователя"));
     } finally {
       setLoading(false);
     }
-  }
+  }, [userId]);
+
+  useEffect(() => {
+    if (Number.isFinite(userId)) {
+      void loadData();
+    }
+  }, [userId, loadData]);
 
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
@@ -245,48 +245,10 @@ export default function UserDetailPage() {
 
                   <div className="flex items-center justify-between py-3 border-b border-border gap-4">
                     <span className="text-sm text-muted-foreground font-medium">
-                      Telegram
-                    </span>
-                    {user.telegramUsername ? (
-                      <a
-                        href={`https://t.me/${user.telegramUsername}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base font-mono font-semibold text-primary hover:underline text-right break-all"
-                      >
-                        {user.telegramUsername}
-                      </a>
-                    ) : (
-                      <span className="text-base font-mono font-semibold text-muted-foreground">
-                        —
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
                       Роль
                     </span>
                     <span className="text-base font-semibold text-right">
                       {getRoleLabel(user.role)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Есть Ronin
-                    </span>
-                    <span
-                      className={cn(
-                        "text-base font-semibold text-right",
-                        hasRoninAccess(user.role)
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-red-600 dark:text-red-400",
-                      )}
-                    >
-                      {hasRoninAccess(user.role)
-                        ? "Да"
-                        : "Нет"}
                     </span>
                   </div>
 
@@ -305,120 +267,43 @@ export default function UserDetailPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                    <Send className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Telegram</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Контакт пользователя
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Username
-                    </p>
-                    {user.telegramUsername ? (
-                      <a
-                        href={`https://t.me/${user.telegramUsername}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-mono font-semibold text-primary hover:underline break-all"
-                      >
-                        {user.telegramUsername}
-                      </a>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Не привязан
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Chat ID
-                    </p>
-                    <p className="text-sm font-mono break-all">
-                      {user.telegramChatId ?? "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                    <Shield className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Статистика</h2>
-                    <p className="text-sm text-muted-foreground">
-                      История бронирований
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Всего бронирований
-                    </p>
-                    <p className="text-2xl font-bold">{bookings.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Последняя активность
-                    </p>
-                    <p className="text-sm">
-                      {bookings[0]
-                        ? formatDateTime(bookings[0].creationTime)
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                   <Clock className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">
-                    Прошлые бронирования
-                  </h2>
+                  <h2 className="text-lg font-semibold">Прошлые заявки</h2>
                   <p className="text-sm text-muted-foreground">
-                    Вся история заявок пользователя
+                    История заявок пользователя на мероприятия
                   </p>
                 </div>
               </div>
 
-              {bookings.length === 0 ? (
+              {events.length === 0 ? (
                 <div className="text-center py-12 bg-secondary/20 border border-border/50 rounded-xl">
                   <div className="max-w-md mx-auto px-4">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <Calendar className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
-                      Бронирований пока нет
+                      Заявок пока нет
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      У этого пользователя ещё нет истории бронирований
+                      У этого пользователя еще нет заявок на съемку
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {bookings.map((booking) => (
+                  {events.map((event) => (
                     <button
-                      key={booking.id}
+                      key={event.id}
                       type="button"
                       onClick={() =>
-                        router.push(`/dashboard/bookings/${booking.id}`)
+                        router.push(`/dashboard/events/${event.id}`)
                       }
                       className="w-full text-left bg-secondary/20 hover:bg-secondary/35 border border-border rounded-xl p-4 transition-colors"
                     >
@@ -428,59 +313,50 @@ export default function UserDetailPage() {
                             <div
                               className={cn(
                                 "w-2 h-2 rounded-full shrink-0",
-                                statusColors[booking.status] || "bg-gray-500",
+                                statusColors[event.status] ?? "bg-gray-500",
                               )}
-                            ></div>
+                            />
                             <span className="text-sm font-medium">
-                              {statusNames[booking.status] || booking.status}
+                              {statusNames[event.status] ?? event.status}
                             </span>
                             <span className="text-xs text-muted-foreground font-mono">
-                              #{booking.id}
+                              #{event.id}
                             </span>
                           </div>
                           <p className="font-medium break-words">
-                            {booking.reason}
+                            {event.reason}
                           </p>
                         </div>
                       </div>
 
                       <div className="grid md:grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">
-                            Период
-                          </p>
-                          <p>{formatDateTime(booking.startTime)}</p>
-                          <p className="text-muted-foreground">
-                            {formatDateTime(booking.endTime)}
-                          </p>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Создано
+                            </p>
+                            <p className="text-sm font-medium">
+                              {formatDateTime(event.creationTime)}
+                            </p>
+                          </div>
                         </div>
+
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">
-                            Оборудование
-                          </p>
-                          <div className="space-y-1">
-                            {booking.equipmentModelIds
-                              .slice(0, 3)
-                              .map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="inline-block rounded-md border border-border/60 bg-secondary/40 px-2 py-1 text-xs text-foreground mr-1 mb-1"
-                                >
-                                  {item.modelName}
-                                </div>
-                              ))}
-                            {booking.equipmentModelIds.length > 3 && (
-                              <p className="text-xs text-muted-foreground">
-                                +{booking.equipmentModelIds.length - 3} ещё
-                              </p>
-                            )}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Период
+                            </p>
+                            <p>{formatDateTime(event.startTime)}</p>
+                            <p className="text-muted-foreground">
+                              {formatDateTime(event.endTime)}
+                            </p>
                           </div>
                         </div>
                       </div>
 
-                      {(booking.comment || booking.adminComment) && (
+                      {(event.comment || event.adminComment) && (
                         <div className="mt-3 pt-3 border-t border-border space-y-2">
-                          {booking.comment && (
+                          {event.comment && (
                             <div className="text-xs bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2">
                               <div className="flex items-center gap-2 mb-1">
                                 <MessageSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
@@ -489,11 +365,11 @@ export default function UserDetailPage() {
                                 </span>
                               </div>
                               <p className="break-words whitespace-pre-wrap">
-                                {booking.comment}
+                                {event.comment}
                               </p>
                             </div>
                           )}
-                          {booking.adminComment && (
+                          {event.adminComment && (
                             <div className="text-xs bg-purple-500/10 border border-purple-500/20 rounded px-3 py-2">
                               <div className="flex items-center gap-2 mb-1">
                                 <MessageSquare className="w-3 h-3 text-purple-600 dark:text-purple-400" />
@@ -502,7 +378,7 @@ export default function UserDetailPage() {
                                 </span>
                               </div>
                               <p className="break-words whitespace-pre-wrap">
-                                {booking.adminComment}
+                                {event.adminComment}
                               </p>
                             </div>
                           )}

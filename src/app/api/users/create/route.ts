@@ -6,12 +6,17 @@ const userService = new UserService();
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const createUserRequest = {
+      login: body.login,
+      password: body.password,
+      name: body.name,
+    };
 
     if (
-      !body.login ||
-      !body.password ||
-      !body.name ||
-      body.password.length < 8
+      !createUserRequest.login ||
+      !createUserRequest.password ||
+      !createUserRequest.name ||
+      createUserRequest.password.length < 8
     ) {
       return NextResponse.json(
         {
@@ -22,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await userService.createUser(body);
+    const user = await userService.createUser(createUserRequest);
     return NextResponse.json(user);
   } catch (error) {
     if (error instanceof Error) {
