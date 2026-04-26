@@ -43,7 +43,8 @@ import { cn } from "@/lib/utils";
 
 export function Header() {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const currentTheme = resolvedTheme ?? "dark";
   const { user, isAuth, logout, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -95,7 +96,7 @@ export function Header() {
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden"
+                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-white/85 backdrop-blur-xl p-0 dark:bg-card/30 [&>button]:hidden"
               >
                 <SheetHeader className="sr-only">
                   <SheetTitle>Навигационное меню</SheetTitle>
@@ -103,11 +104,11 @@ export function Header() {
                     Мобильное меню навигации и действий пользователя.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="bg-gradient-to-b from-background/80 to-background/40 h-full flex flex-col">
+                <div className="h-full flex flex-col bg-transparent">
                   <div className="px-6 py-6 border-b border-border/30">
                     <div className="relative">
                       <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-purple-500/20 to-primary/20 rounded-lg blur opacity-25"></div>
-                      <div className="relative flex items-center gap-3 bg-card/50 backdrop-blur rounded-lg px-4 py-3 border border-border/50">
+                      <div className="relative flex items-center gap-3 rounded-lg border border-border/50 bg-muted/70 px-4 py-3 backdrop-blur dark:bg-card/50">
                         <div className="relative w-10 h-10 shrink-0">
                           <Image
                             src={LogoDark}
@@ -147,13 +148,10 @@ export function Header() {
                               className={cn(
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                                 isActive
-                                  ? "bg-secondary text-foreground font-medium"
+                                  ? "bg-muted text-foreground font-medium"
                                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                               )}
                             >
-                              {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
-                              )}
                               <item.icon
                                 className={cn(
                                   "w-4 h-4 ml-2 transition-colors shrink-0",
@@ -198,14 +196,14 @@ export function Header() {
                     </div>
                   </div>
 
-                  <div className="p-3 border-t border-border/30 bg-gradient-to-t from-background/60 to-transparent space-y-3">
+                  <div className="p-3 border-t border-border/30 bg-transparent space-y-3">
                     <Link
-                      href={personalDashboardHref}
+                      href="/dashboard/profile"
                       onClick={closeMobileMenu}
                       className="relative block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-purple-500/10 to-primary/10 rounded-xl blur-sm opacity-50"></div>
-                      <div className="relative flex items-center gap-3 px-3 py-3 bg-card/50 backdrop-blur border border-border/50 rounded-xl transition-colors hover:bg-card/70">
+                      <div className="relative flex items-center gap-3 px-3 py-3 bg-muted/70 backdrop-blur border border-border/50 rounded-xl transition-colors hover:bg-muted/90 dark:bg-card/50 dark:hover:bg-card/70">
                         <div className="relative shrink-0">
                           {isAdmin && (
                             <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
@@ -251,7 +249,7 @@ export function Header() {
                         variant="ghost"
                         className="w-full justify-start gap-3 hover:bg-secondary/50"
                         onClick={() =>
-                          setTheme(theme === "dark" ? "light" : "dark")
+                          setTheme(currentTheme === "dark" ? "light" : "dark")
                         }
                       >
                         <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center relative shrink-0">
@@ -259,7 +257,9 @@ export function Header() {
                           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                         </div>
                         <span className="text-sm">
-                          {theme === "dark" ? "Светлая тема" : "Темная тема"}
+                          {currentTheme === "dark"
+                            ? "Светлая тема"
+                            : "Темная тема"}
                         </span>
                       </Button>
 
@@ -291,7 +291,7 @@ export function Header() {
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-card/30 backdrop-blur-xl p-0 [&>button]:hidden"
+                className="w-[280px] sm:w-[320px] border-r border-border/50 bg-white/85 backdrop-blur-xl p-0 dark:bg-card/30 [&>button]:hidden"
               >
                 <SheetHeader className="sr-only">
                   <SheetTitle>Навигационное меню</SheetTitle>
@@ -299,11 +299,11 @@ export function Header() {
                     Мобильное меню навигации, входа и регистрации.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="bg-gradient-to-b from-background/80 to-background/40 h-full flex flex-col">
+                <div className="h-full flex flex-col bg-transparent">
                   <div className="px-6 py-6 border-b border-border/30">
                     <div className="relative">
                       <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-purple-500/20 to-primary/20 rounded-lg blur opacity-25"></div>
-                      <div className="relative flex items-center gap-3 bg-card/50 backdrop-blur rounded-lg px-4 py-3 border border-border/50">
+                      <div className="relative flex items-center gap-3 rounded-lg border border-border/50 bg-muted/70 px-4 py-3 backdrop-blur dark:bg-card/50">
                         <div className="relative w-10 h-10 shrink-0">
                           <Image
                             src={LogoDark}
@@ -343,13 +343,10 @@ export function Header() {
                               className={cn(
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                                 isActive
-                                  ? "bg-secondary text-foreground font-medium"
+                                  ? "bg-muted text-foreground font-medium"
                                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                               )}
                             >
-                              {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"></div>
-                              )}
                               <item.icon
                                 className={cn(
                                   "w-4 h-4 ml-2 transition-colors shrink-0",
@@ -364,7 +361,7 @@ export function Header() {
                     </div>
                   </div>
 
-                  <div className="p-3 border-t border-border/30 bg-gradient-to-t from-background/60 to-transparent space-y-2">
+                  <div className="p-3 border-t border-border/30 bg-transparent space-y-2">
                     <Button
                       asChild
                       variant="outline"
@@ -428,7 +425,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
             className="relative hover:bg-secondary/50"
             aria-label="Переключить тему"
           >
@@ -466,7 +463,7 @@ export function Header() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuItem asChild className="cursor-pointer">
                     <Link
-                      href={personalDashboardHref}
+                      href="/dashboard/profile"
                       className="flex flex-col items-start space-y-1 py-2"
                     >
                       <div className="flex items-center gap-2">

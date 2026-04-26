@@ -346,56 +346,56 @@ export default function UsersPage() {
                 return (
                   <div
                     key={user.id}
-                    className="bg-card border border-border rounded-xl p-4 cursor-pointer transition-colors hover:bg-muted/30"
+                    className="bg-card border border-border rounded-xl p-4"
                   >
-                    {user.banned && (
-                      <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                    <button
+                      type="button"
+                      className="block w-full cursor-pointer text-left"
+                      onClick={() => openUser(user.id)}
+                    >
+                      {user.banned && (
+                        <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
+                            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                              Заблокирован
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
-                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                            Заблокирован
-                          </p>
+                          <UserIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={cn(
+                                  "font-medium text-sm truncate",
+                                  isAdmin
+                                    ? "text-blue-600 dark:text-blue-400"
+                                    : "",
+                                )}
+                              >
+                                {user.name}
+                              </p>
+                              {isSelf && (
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                  Вы
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              @{user.login}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </button>
 
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <UserIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p
-                              className={cn(
-                                "font-medium text-sm truncate",
-                                isAdmin
-                                  ? "text-blue-600 dark:text-blue-400"
-                                  : "",
-                              )}
-                            >
-                              {user.name}
-                            </p>
-                            {isSelf && (
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                                Вы
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            @{user.login}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onClick={() => openUser(user.id)}
-                        className="w-full"
-                      >
-                        Открыть
-                      </Button>
                       {!isSelf && (
-                        <div className="pt-2 border-t border-border grid grid-cols-2 gap-2">
+                        <div className="mt-2 pt-2 border-t border-border grid grid-cols-2 gap-2">
                           <Button
                             size="sm"
                             variant={user.banned ? "default" : "destructive"}
@@ -449,7 +449,7 @@ export default function UsersPage() {
                               onMouseDownCapture={stopRowNavigation}
                             >
                               <UserIcon className="w-3 h-3 mr-1" />
-                              Обычный доступ
+                              Снять админа
                             </Button>
                           )}
                         </div>
