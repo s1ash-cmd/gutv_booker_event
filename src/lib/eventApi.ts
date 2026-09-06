@@ -5,6 +5,11 @@ import type {
 import { authenticatedApiRequest } from "./authApi";
 
 export const eventApi = {
+  update_content_list: async (id: number, contentList: string) =>
+    authenticatedApiRequest<EventResponseDto>(`/api/event/content_list/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ contentList }),
+    }),
   get_all: async () =>
     authenticatedApiRequest<EventResponseDto[]>("/api/event/get_all"),
 

@@ -4,6 +4,12 @@ import type {
 } from "@/app/models/event/event";
 import { UserRole } from "@/app/models/user/user";
 import type { Event, User } from "@/generated/prisma/client";
+import {
+  contentListDeadline,
+  eventDetailsSchema,
+  moscowDate,
+  validateEventDetails,
+} from "@/lib/eventRequirements";
 import { prisma } from "@/lib/prisma";
 
 export enum EventStatus {
@@ -23,9 +29,27 @@ function parseWarnings(value: string) {
   }
 }
 
+function parseDetails(value: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = eventDetailsSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export class EventValidationError extends Error {
+  constructor(public fields: Record<string, string>) {
+    super(Object.values(fields)[0] ?? "Проверьте заявку");
+  }
+}
+
 function mapEvent(event: Event): EventResponseDto {
   return {
     id: event.id,
+    clientId: event.userId,
+    details: parseDetails(event.detailsJson),
     client: event.client,
     reason: event.reason,
     creationTime: event.creationTime.toISOString(),
@@ -39,25 +63,30 @@ function mapEvent(event: Event): EventResponseDto {
 }
 
 function ensureValidInput(input: CreateEventRequestDto) {
-  if (!input.reason?.trim()) {
-    throw new Error("Причина не может быть пустой");
-  }
-
-  const startTime = new Date(input.startTime);
-  const endTime = new Date(input.endTime);
-
-  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
-    throw new Error("Некорректная дата события");
-  }
-
-  if (startTime >= endTime) {
-    throw new Error("Дата начала должна быть раньше даты окончания");
-  }
-
-  return { startTime, endTime };
+  const { details, errors } = validateEventDetails(input?.details);
+  if (typeof input?.reason !== "string" || !input.reason.trim())
+    errors.reason = "Укажите обоснование заявки";
+  else if (input.reason.length > 20000)
+    errors.reason = "Обоснование: не более 20 000 символов";
+  if (
+    input?.comment != null &&
+    (typeof input.comment !== "string" || input.comment.length > 20000)
+  )
+    errors.comment = "Комментарий: не более 20 000 символов";
+  if (!details || Object.keys(errors).length)
+    throw new EventValidationError(errors);
+  // The structured schedule is authoritative; clients cannot bypass deadlines via the summary dates.
+  const startTime = new Date(
+    Math.min(...details.sessions.map((s) => new Date(s.startTime).getTime())),
+  );
+  const endTime = new Date(
+    Math.max(...details.sessions.map((s) => new Date(s.endTime).getTime())),
+  );
+  return { startTime, endTime, details };
 }
 
 function ensureCanCreateEvent(user: User) {
+  if (user.banned) throw new Error("Ваш аккаунт заблокирован");
   const allowedRoles = [UserRole.Admin, UserRole.Organization];
   if (!allowedRoles.includes(user.role)) {
     throw new Error(
@@ -71,7 +100,7 @@ export class EventService {
     input: CreateEventRequestDto,
     currentUser: { id: number },
   ): Promise<EventResponseDto> {
-    const { startTime, endTime } = ensureValidInput(input);
+    const { startTime, endTime, details } = ensureValidInput(input);
 
     const user = await prisma.user.findUnique({
       where: { id: currentUser.id },
@@ -84,8 +113,8 @@ export class EventService {
     ensureCanCreateEvent(user);
 
     const warnings: Record<string, unknown> = {};
-    if ((startTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24) < 2) {
-      warnings.invalidDate = "Событие создается меньше чем за 2 дня";
+    if (details.requestType === "trip" && !details.contentList) {
+      warnings.contentListMissing = `Перечень необходимого контента нужно предоставить до ${contentListDeadline(details)} (за 1 месяц до выезда)`;
     }
 
     const event = await prisma.event.create({
@@ -100,10 +129,57 @@ export class EventService {
         comment: input.comment?.trim() || null,
         adminComment: null,
         warningsJson: JSON.stringify(warnings),
+        detailsJson: JSON.stringify(details),
       },
     });
 
     return mapEvent(event);
+  }
+
+  async updateContentList(
+    id: number,
+    contentList: unknown,
+    currentUser: { id: number; roleName: string },
+  ): Promise<EventResponseDto> {
+    if (!Number.isInteger(id) || id < 1)
+      throw new Error("Некорректный идентификатор заявки");
+    if (
+      typeof contentList !== "string" ||
+      !contentList.trim() ||
+      contentList.length > 20000
+    )
+      throw new Error("Укажите перечень контента (до 20 000 символов)");
+    const user = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+    });
+    if (!user || user.banned) throw new Error("Нет доступа к изменению заявки");
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event || (event.userId !== user.id && user.role !== UserRole.Admin))
+      throw new Error("Нет доступа к этой заявке");
+    const details = parseDetails(event.detailsJson);
+    if (!details || details.requestType !== "trip")
+      throw new Error("Перечень контента доступен только для выездной учёбы");
+    if (![EventStatus.Pending, EventStatus.Approved].includes(event.status))
+      throw new Error("Эту заявку уже нельзя дополнить");
+    details.contentList = contentList.trim();
+    const warnings = parseWarnings(event.warningsJson);
+    delete warnings.contentListMissing;
+    if (moscowDate(new Date()) > contentListDeadline(details))
+      warnings.contentListLate =
+        "Перечень контента предоставлен позднее чем за 1 месяц до выезда. Требуется согласование с директором ГУТВ.";
+    const updated = await prisma.event.updateMany({
+      where: {
+        id,
+        status: { in: [EventStatus.Pending, EventStatus.Approved] },
+      },
+      data: {
+        detailsJson: JSON.stringify(details),
+        warningsJson: JSON.stringify(warnings),
+      },
+    });
+    if (!updated.count)
+      throw new Error("Статус заявки изменился. Обновите страницу");
+    return mapEvent(await prisma.event.findUniqueOrThrow({ where: { id } }));
   }
 
   async getAllEvents(): Promise<EventResponseDto[]> {

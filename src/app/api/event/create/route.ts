@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/authUtils";
-import { EventService } from "@/services/eventService";
+import { EventService, EventValidationError } from "@/services/eventService";
 
 const eventService = new EventService();
 
@@ -11,6 +11,21 @@ export async function POST(request: NextRequest) {
     const event = await eventService.createEvent(body, user);
     return NextResponse.json(event);
   } catch (error) {
+    if (error instanceof EventValidationError)
+      return NextResponse.json(
+        { error: error.message, fields: error.fields },
+        { status: 400 },
+      );
+    if (error instanceof Error && error.name.startsWith("Prisma")) {
+      console.error("Failed to create event", error);
+      return NextResponse.json(
+        {
+          error:
+            "Не удалось сохранить заявку. Попробуйте позже или свяжитесь с командой ГУТВ.",
+        },
+        { status: 500 },
+      );
+    }
     if (error instanceof Error) {
       if (
         error.message === "Unauthorized" ||

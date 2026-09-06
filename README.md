@@ -1,36 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ГУтв Заявки
 
-## Getting Started
+Сервис заявок на освещение мероприятий, создание видеоконтента и выездные учёбы. Форма и правила основаны на документах руководства «Правила Работы с Организациями», «Шаблон_заявок2» и «итоговый пример».
 
-First, run the development server:
+## Запуск
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Установите зависимости (`npm install`), настройте `DATABASE_URL` и переменные `JWT_*` в `.env`, затем запустите `npm run dev`. Перед dev-сервером автоматически генерируется Prisma Client и применяются миграции. После изменения схемы остановите и снова запустите dev-сервер: горячая перезагрузка не обновляет уже созданный экземпляр Prisma.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Для рабочей сборки: `npm run build`, `npx prisma migrate deploy`, затем `npm start`. Перед миграцией существующей базы сделайте резервную копию. Миграция `20260905120000_event_request_details` добавляет только nullable-поле `detailsJson`; старые заявки остаются доступны.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Если база была создана до подключения миграций и уже содержит таблицы Users и Events, сначала сравните её с начальной миграцией. После проверки и резервного копирования отметьте базовую миграцию командой `npx prisma migrate resolve --applied 20260424193000_initial_event_schema`, затем выполните `npx prisma migrate deploy`. Не сбрасывайте базу для обновления схемы.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Правила обработки
 
-## Learn More
+- Освещение: не позднее чем за 14 дней до первого мероприятия.
+- Видеоконтент: не позднее чем за 21 день до указанной даты сдачи. Для совмещённой заявки проверяются оба срока.
+- Выездная учёба: не позднее чем за 2 календарных месяца до первого выезда.
+- Даты и сроки считаются по московскому времени. Месяцы календарные, с ограничением последним днём месяца.
+- Перечень контента для выезда можно предоставить позднее первичной заявки, не позднее чем за 1 месяц до выезда. Владелец и администратор могут дополнить его в ожидающей или одобренной заявке. Позднее дополнение сохраняется с предупреждением для согласования; отменённые и завершённые заявки не изменяются.
+- Проверки выполняются и в форме, и на сервере. Сводные даты заявки сервер вычисляет из всех интервалов съёмки.
+- Обещание рассмотрения за 3 рабочих дня отражено в правилах; автоматическая отправка уведомлений и назначение команды не выполняются.
 
-To learn more about Next.js, take a look at the following resources:
+## Проверки
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run lint` — проверка кода; `npm test` — границы сроков и обязательные поля; `npm run test:integration` — сборка и полный цикл API на временной SQLite-базе (порт 3198). Интеграционная проверка создаёт отдельные тестовые аккаунты и заявки, проверяет права, сохранение нескольких интервалов, старые записи, перечень контента и модерацию, затем удаляет тестовую базу. Рабочая база не используется.

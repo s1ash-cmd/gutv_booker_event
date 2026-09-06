@@ -2,6 +2,8 @@
 
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   Ban,
   Filter,
   Search,
@@ -10,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,12 +53,12 @@ function isNotFoundError(error: unknown): boolean {
 export default function UsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserResponseDto[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<UserResponseDto[]>([]);
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBanStatus, setSelectedBanStatus] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<"nameAsc" | "nameDesc">("nameAsc");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   const loadCurrentUser = useCallback(async () => {
@@ -85,7 +87,6 @@ export default function UsersPage() {
       }
 
       setUsers(data);
-      setFilteredUsers(data);
     } catch (err: unknown) {
       console.error("Ошибка загрузки пользователей:", err);
       setError(
@@ -95,48 +96,36 @@ export default function UsersPage() {
         ),
       );
       setUsers([]);
-      setFilteredUsers([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleSearch = useCallback(() => {
-    let filtered = users;
-
-    if (selectedBanStatus === "banned") {
-      filtered = filtered.filter((u) => u.banned);
-    } else if (selectedBanStatus === "active") {
-      filtered = filtered.filter((u) => !u.banned);
-    }
-
-    if (!searchQuery.trim()) {
-      setFilteredUsers(filtered);
-      return;
-    }
-
-    const query = searchQuery.trim();
-    const lowerQuery = query.toLowerCase();
-    filtered = filtered.filter(
-      (u) =>
-        u.name.toLowerCase().includes(lowerQuery) ||
-        u.login.toLowerCase().includes(lowerQuery),
-    );
-    setFilteredUsers(filtered);
-  }, [searchQuery, selectedBanStatus, users]);
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return users
+      .filter((user) => {
+        const matchesStatus =
+          selectedBanStatus === "all" ||
+          (selectedBanStatus === "banned" ? user.banned : !user.banned);
+        return (
+          matchesStatus &&
+          (user.name.toLowerCase().includes(query) ||
+            user.login.toLowerCase().includes(query))
+        );
+      })
+      .sort((left, right) => {
+        const result = left.name.localeCompare(right.name, "ru", {
+          sensitivity: "base",
+        });
+        return sortOrder === "nameAsc" ? result : -result;
+      });
+  }, [users, searchQuery, selectedBanStatus, sortOrder]);
 
   useEffect(() => {
     void loadCurrentUser();
     void loadUsers();
   }, [loadCurrentUser, loadUsers]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [handleSearch]);
 
   async function handleBan(id: number, currentBanStatus: boolean) {
     try {
@@ -179,7 +168,6 @@ export default function UsersPage() {
     setSearchQuery("");
     setSelectedBanStatus("all");
     setError(null);
-    loadUsers();
   }
 
   function isCurrentUser(userId: number): boolean {
@@ -227,6 +215,7 @@ export default function UsersPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Поиск по имени или логину..."
+                aria-label="Поиск по имени или логину"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -237,7 +226,10 @@ export default function UsersPage() {
               value={selectedBanStatus}
               onValueChange={setSelectedBanStatus}
             >
-              <SelectTrigger className="w-full lg:w-[180px]">
+              <SelectTrigger
+                className="w-full lg:w-[180px]"
+                aria-label="Статус пользователя"
+              >
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Статус" />
               </SelectTrigger>
@@ -248,6 +240,22 @@ export default function UsersPage() {
               </SelectContent>
             </Select>
 
+            <Button
+              variant="outline"
+              onClick={() =>
+                setSortOrder((value) =>
+                  value === "nameAsc" ? "nameDesc" : "nameAsc",
+                )
+              }
+              aria-label="Изменить порядок сортировки имён"
+            >
+              {sortOrder === "nameAsc" ? (
+                <ArrowUp className="h-4 w-4" />
+              ) : (
+                <ArrowDown className="h-4 w-4" />
+              )}
+              По имени
+            </Button>
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -255,6 +263,7 @@ export default function UsersPage() {
                 onClick={clearFilters}
                 className="shrink-0"
                 title="Сбросить все фильтры"
+                aria-label="Сбросить все фильтры"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -403,7 +412,7 @@ export default function UsersPage() {
                             onClick={(event) =>
                               handleBanClick(event, user.id, user.banned)
                             }
-                            disabled={actionLoading === user.id}
+                            disabled={actionLoading !== null || !currentUser}
                             className="w-full"
                             onMouseDownCapture={stopRowNavigation}
                           >
@@ -425,7 +434,7 @@ export default function UsersPage() {
                               onClick={(event) =>
                                 handleRoleButtonClick(event, user.id, "admin")
                               }
-                              disabled={actionLoading === user.id}
+                              disabled={actionLoading !== null || !currentUser}
                               className="w-full"
                               onMouseDownCapture={stopRowNavigation}
                             >
@@ -444,7 +453,7 @@ export default function UsersPage() {
                                   "organization",
                                 )
                               }
-                              disabled={actionLoading === user.id}
+                              disabled={actionLoading !== null || !currentUser}
                               className="w-full"
                               onMouseDownCapture={stopRowNavigation}
                             >
@@ -464,7 +473,28 @@ export default function UsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Имя</TableHead>
+                    <TableHead
+                      aria-sort={
+                        sortOrder === "nameAsc" ? "ascending" : "descending"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSortOrder((value) =>
+                            value === "nameAsc" ? "nameDesc" : "nameAsc",
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 font-semibold text-foreground transition-colors hover:text-primary"
+                      >
+                        Имя
+                        {sortOrder === "nameAsc" ? (
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>Логин</TableHead>
                     <TableHead className="w-[100px]">Статус</TableHead>
                     <TableHead className="w-[380px]">Действия</TableHead>
@@ -480,6 +510,16 @@ export default function UsersPage() {
                         key={user.id}
                         className="hover:bg-muted/50 cursor-pointer"
                         onClick={() => openUser(user.id)}
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (
+                            event.target === event.currentTarget &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            openUser(user.id);
+                          }
+                        }}
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -535,7 +575,9 @@ export default function UsersPage() {
                                 onClick={(event) =>
                                   handleBanClick(event, user.id, user.banned)
                                 }
-                                disabled={actionLoading === user.id}
+                                disabled={
+                                  actionLoading !== null || !currentUser
+                                }
                                 className="w-full whitespace-nowrap"
                                 onMouseDownCapture={stopRowNavigation}
                               >
@@ -563,7 +605,9 @@ export default function UsersPage() {
                                       "admin",
                                     )
                                   }
-                                  disabled={actionLoading === user.id}
+                                  disabled={
+                                    actionLoading !== null || !currentUser
+                                  }
                                   className="w-full whitespace-nowrap"
                                   onMouseDownCapture={stopRowNavigation}
                                 >
@@ -582,7 +626,9 @@ export default function UsersPage() {
                                       "organization",
                                     )
                                   }
-                                  disabled={actionLoading === user.id}
+                                  disabled={
+                                    actionLoading !== null || !currentUser
+                                  }
                                   className="w-full whitespace-nowrap"
                                   onMouseDownCapture={stopRowNavigation}
                                 >

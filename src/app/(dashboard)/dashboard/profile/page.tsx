@@ -37,7 +37,10 @@ export default function Home() {
   if (loading) {
     return (
       <main className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <output
+          aria-label="Загрузка профиля"
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"
+        />
       </main>
     );
   }
@@ -45,7 +48,7 @@ export default function Home() {
   if (error || !userData) {
     return (
       <main className="flex items-center justify-center min-h-screen p-6">
-        <div className="text-center">
+        <div className="text-center" role="alert">
           <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
           <p className="text-muted-foreground">
             {error || "Пользователь не найден"}
@@ -64,9 +67,6 @@ export default function Home() {
           <h1 className="text-2xl lg:text-3xl font-bold truncate">
             {userData.name}
           </h1>
-          <p className="text-sm text-muted-foreground truncate">
-            @{userData.login}
-          </p>
         </div>
 
         <div className="grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
@@ -119,6 +119,21 @@ export default function Home() {
                   </span>
                   <span className="text-base font-semibold text-right">
                     {getRoleLabel(userData.role)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-3 gap-4">
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Статус
+                  </span>
+                  <span
+                    className={cn(
+                      "text-base font-semibold text-right",
+                      userData.banned
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-green-600 dark:text-green-400",
+                    )}
+                  >
+                    {userData.banned ? "Заблокирован" : "Активен"}
                   </span>
                 </div>
               </div>

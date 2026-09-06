@@ -4,7 +4,6 @@ import {
   BookOpen,
   BookUser,
   CalendarPlus,
-  Home,
   LogOut,
   Menu,
   Moon,
@@ -38,8 +37,13 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvatarUrl } from "@/lib/avatar";
-import { canCreateEvent, isAdminRole } from "@/lib/roles";
+import { isAdminRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+
+function isCurrentPath(pathname: string, href: string) {
+  if (href === "/") return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -52,22 +56,24 @@ export function Header() {
     return (
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between mx-auto px-4 md:px-8">
-          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <output aria-live="polite">
+            <span
+              className="block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Загрузка профиля</span>
+          </output>
         </div>
       </header>
     );
   }
 
   const isAdmin = isAdminRole(user?.role);
-  const canOpenEvent = canCreateEvent(user?.role);
   const personalDashboardHref = "/dashboard/events/my";
   const personalDashboardLabel = "Мои заявки";
 
   const navItems = [
-    { name: "Главная", href: "/", icon: Home },
-    ...(canOpenEvent
-      ? [{ name: "Создать заявку", href: "/event", icon: CalendarPlus }]
-      : []),
+    { name: "Новая заявка", href: "/", icon: CalendarPlus },
     { name: "Правила", href: "/rules", icon: BookOpen },
     { name: "Контакты", href: "/contacts", icon: BookUser },
   ];
@@ -90,6 +96,7 @@ export function Header() {
                   variant="ghost"
                   size="icon"
                   className="md:hidden shrink-0 hover:bg-secondary/50"
+                  aria-label="Открыть меню"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
@@ -139,11 +146,12 @@ export function Header() {
                       </p>
                       <nav className="space-y-1">
                         {navItems.map((item) => {
-                          const isActive = pathname === item.href;
+                          const isActive = isCurrentPath(pathname, item.href);
                           return (
                             <Link
                               key={item.href}
                               href={item.href}
+                              aria-current={isActive ? "page" : undefined}
                               onClick={closeMobileMenu}
                               className={cn(
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
@@ -236,7 +244,7 @@ export function Header() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
-                            @{user.login}
+                            {user.login}
                           </p>
                         </div>
                       </div>
@@ -284,7 +292,8 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="sm:hidden shrink-0 hover:bg-secondary/50"
+                  className="md:hidden shrink-0 hover:bg-secondary/50"
+                  aria-label="Открыть меню"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
@@ -334,11 +343,12 @@ export function Header() {
                       </p>
                       <nav className="space-y-1">
                         {navItems.map((item) => {
-                          const isActive = pathname === item.href;
+                          const isActive = isCurrentPath(pathname, item.href);
                           return (
                             <Link
                               key={item.href}
                               href={item.href}
+                              aria-current={isActive ? "page" : undefined}
                               onClick={closeMobileMenu}
                               className={cn(
                                 "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
@@ -408,9 +418,12 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={
+                  isCurrentPath(pathname, item.href) ? "page" : undefined
+                }
                 className={cn(
                   "relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200",
-                  pathname === item.href
+                  isCurrentPath(pathname, item.href)
                     ? "text-foreground bg-secondary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
                 )}
@@ -440,6 +453,7 @@ export function Header() {
                   <Button
                     variant="ghost"
                     className="relative h-9 w-9 rounded-full group hidden md:flex hover:bg-secondary/50"
+                    aria-label="Открыть меню пользователя"
                   >
                     {isAdmin && (
                       <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75 group-hover:opacity-100 transition duration-300"></div>
@@ -478,7 +492,7 @@ export function Header() {
                         )}
                       </div>
                       <p className="text-xs leading-none text-muted-foreground">
-                        @{user.login}
+                        {user.login}
                       </p>
                     </Link>
                   </DropdownMenuItem>

@@ -9,8 +9,9 @@ import {
   Search,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EventResponseDto } from "@/app/models/event/event";
 import { AdminOnly } from "@/components/AdminOnly";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { eventApi } from "@/lib/eventApi";
+import { requestTypeLabels } from "@/lib/eventRequirements";
 import { formatWarningMessages } from "@/lib/userFacingMessages";
 import { cn } from "@/lib/utils";
 
@@ -69,41 +71,18 @@ function isNotFoundError(error: unknown): boolean {
 export default function EventsDashboardPage() {
   const router = useRouter();
   const [events, setEvents] = useState<EventResponseDto[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<EventResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("Pending");
 
-  const handleSearch = useCallback(() => {
-    if (!searchQuery.trim()) {
-      setFilteredEvents(events);
-      return;
-    }
-
-    const query = searchQuery.trim();
-
-    if (/^\d+$/.test(query)) {
-      const filtered = events.filter(
-        (event) => event.id === Number.parseInt(query, 10),
-      );
-      setFilteredEvents(filtered);
-      return;
-    }
-
-    const lowerQuery = query.toLowerCase();
-    const filtered = events.filter(
-      (event) =>
-        event.client.toLowerCase().includes(lowerQuery) ||
-        event.reason.toLowerCase().includes(lowerQuery) ||
-        (event.comment?.toLowerCase().includes(lowerQuery) ?? false) ||
-        (event.adminComment?.toLowerCase().includes(lowerQuery) ?? false),
-    );
-
-    setFilteredEvents(filtered);
-  }, [events, searchQuery]);
+  const [sortOrder, setSortOrder] = useState<"createdDesc" | "createdAsc">(
+    "createdDesc",
+  );
+  const latestRequestId = useRef(0);
 
   const loadEvents = useCallback(async () => {
+    const requestId = ++latestRequestId.current;
     try {
       setLoading(true);
       setError(null);
@@ -113,41 +92,29 @@ export default function EventsDashboardPage() {
           ? await eventApi.get_all()
           : await eventApi.get_by_status(selectedStatus);
 
-      setEvents(data);
-      setFilteredEvents(data);
+      if (requestId === latestRequestId.current) setEvents(data);
     } catch (loadError: unknown) {
+      if (requestId !== latestRequestId.current) return;
       console.error("Ошибка загрузки заявок:", loadError);
       setEvents([]);
-      setFilteredEvents([]);
       setError(
         isNotFoundError(loadError)
           ? null
           : getErrorMessage(loadError, "Не удалось загрузить заявки"),
       );
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) setLoading(false);
     }
   }, [selectedStatus]);
-
-  useEffect(() => {
-    setSelectedStatus("Pending");
-  }, []);
 
   useEffect(() => {
     void loadEvents();
   }, [loadEvents]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [handleSearch]);
-
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
     return date.toLocaleString("ru-RU", {
+      timeZone: "Europe/Moscow",
       day: "2-digit",
       month: "short",
       hour: "2-digit",
@@ -159,9 +126,40 @@ export default function EventsDashboardPage() {
     setError(null);
     setSearchQuery("");
     setSelectedStatus("all");
+    setSortOrder("createdDesc");
   }
 
-  const hasActiveFilters = selectedStatus !== "all" || Boolean(searchQuery);
+  const filteredEvents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return events
+      .filter(
+        (event) =>
+          (selectedStatus === "all" || event.status === selectedStatus) &&
+          (!query ||
+            String(event.id) === query ||
+            [
+              event.client,
+              event.reason,
+              event.comment,
+              event.adminComment,
+              event.details?.organization,
+              event.details?.representativeName,
+              event.details?.requestType
+                ? requestTypeLabels[event.details.requestType]
+                : undefined,
+            ].some((value) => value?.toLowerCase().includes(query))),
+      )
+      .sort((left, right) => {
+        const difference =
+          new Date(right.creationTime).getTime() -
+          new Date(left.creationTime).getTime();
+        return sortOrder === "createdDesc" ? difference : -difference;
+      });
+  }, [events, searchQuery, selectedStatus, sortOrder]);
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    selectedStatus !== "all" ||
+    sortOrder !== "createdDesc";
 
   return (
     <AdminOnly>
@@ -173,10 +171,11 @@ export default function EventsDashboardPage() {
 
           <div className="bg-card/50 backdrop-blur border border-border rounded-xl p-4">
             <div className="flex flex-col md:flex-row gap-3">
-              <div className="flex-1 relative">
+              <div className="min-w-0 flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Поиск..."
+                  aria-label="Поиск заявок"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -184,7 +183,10 @@ export default function EventsDashboardPage() {
               </div>
 
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-full md:w-[220px]">
+                <SelectTrigger
+                  aria-label="Статус заявки"
+                  className="w-full md:w-[200px]"
+                >
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Статус" />
                 </SelectTrigger>
@@ -198,6 +200,24 @@ export default function EventsDashboardPage() {
                 </SelectContent>
               </Select>
 
+              <Select
+                value={sortOrder}
+                onValueChange={(value) =>
+                  setSortOrder(value as "createdDesc" | "createdAsc")
+                }
+              >
+                <SelectTrigger
+                  aria-label="Сортировка заявок"
+                  className="w-full md:w-[220px]"
+                >
+                  <SelectValue placeholder="Сортировка" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="createdDesc">Сначала новые</SelectItem>
+                  <SelectItem value="createdAsc">Сначала старые</SelectItem>
+                </SelectContent>
+              </Select>
+
               {hasActiveFilters && (
                 <Button
                   variant="ghost"
@@ -205,6 +225,7 @@ export default function EventsDashboardPage() {
                   onClick={clearFilters}
                   className="shrink-0"
                   title="Сбросить все фильтры"
+                  aria-label="Сбросить все фильтры"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -219,15 +240,25 @@ export default function EventsDashboardPage() {
                     {searchQuery}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                  {statusNames[selectedStatus]}
-                </span>
+                {selectedStatus !== "all" && (
+                  <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
+                    {statusNames[selectedStatus]}
+                  </span>
+                )}
+                {sortOrder !== "createdDesc" && (
+                  <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
+                    Сначала старые
+                  </span>
+                )}
               </div>
             )}
           </div>
 
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
+            <div
+              role="alert"
+              className="bg-destructive/10 border border-destructive/20 rounded-xl p-4"
+            >
               <div className="flex items-start gap-3">
                 <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center shrink-0 mt-0.5">
                   <AlertCircle className="w-3 h-3 text-destructive" />
@@ -251,7 +282,7 @@ export default function EventsDashboardPage() {
           )}
 
           {loading ? (
-            <div className="text-center py-12">
+            <div aria-live="polite" className="text-center py-12">
               <div className="inline-flex items-center gap-2 text-muted-foreground">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <p>Загрузка...</p>
@@ -284,11 +315,10 @@ export default function EventsDashboardPage() {
             <>
               <div className="md:hidden space-y-4">
                 {filteredEvents.map((event) => (
-                  <button
+                  <Link
                     key={event.id}
-                    type="button"
-                    onClick={() => router.push(`/dashboard/events/${event.id}`)}
-                    className="w-full text-left bg-card border border-border rounded-xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
+                    href={`/dashboard/events/${event.id}`}
+                    className="block w-full text-left bg-card border border-border rounded-xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -307,6 +337,11 @@ export default function EventsDashboardPage() {
                       </span>
                     </div>
 
+                    {event.details && (
+                      <p className="mb-3 text-xs font-medium text-primary">
+                        {requestTypeLabels[event.details.requestType]}
+                      </p>
+                    )}
                     {formatWarningMessages(event.warnings).length > 0 && (
                       <div className="mb-3 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 mb-1">
@@ -336,6 +371,11 @@ export default function EventsDashboardPage() {
                           Клиент
                         </p>
                         <p className="text-sm font-medium">{event.client}</p>
+                        {event.details && (
+                          <p className="text-xs text-muted-foreground break-words">
+                            {event.details.organization}
+                          </p>
+                        )}
                       </div>
 
                       <div className="bg-secondary/30 rounded-lg px-3 py-2">
@@ -387,7 +427,7 @@ export default function EventsDashboardPage() {
                         </div>
                       )}
                     </div>
-                  </button>
+                  </Link>
                 ))}
               </div>
 
@@ -399,7 +439,7 @@ export default function EventsDashboardPage() {
                       <TableHead className="w-[100px]">Статус</TableHead>
                       <TableHead>Клиент</TableHead>
                       <TableHead className="max-w-[240px]">Причина</TableHead>
-                      <TableHead>Период</TableHead>
+                      <TableHead>Период (МСК)</TableHead>
                       <TableHead>Создано</TableHead>
                       <TableHead className="max-w-[220px]">
                         Комментарии
@@ -413,7 +453,17 @@ export default function EventsDashboardPage() {
                     {filteredEvents.map((event) => (
                       <TableRow
                         key={event.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary"
+                        tabIndex={0}
+                        onKeyDown={(keyEvent) => {
+                          if (
+                            keyEvent.key === "Enter" ||
+                            keyEvent.key === " "
+                          ) {
+                            keyEvent.preventDefault();
+                            router.push(`/dashboard/events/${event.id}`);
+                          }
+                        }}
                         onClick={() =>
                           router.push(`/dashboard/events/${event.id}`)
                         }
@@ -436,6 +486,16 @@ export default function EventsDashboardPage() {
                         </TableCell>
                         <TableCell>
                           <p className="font-medium">{event.client}</p>
+                          {event.details && (
+                            <p className="text-xs font-medium text-primary">
+                              {requestTypeLabels[event.details.requestType]}
+                            </p>
+                          )}
+                          {event.details && (
+                            <p className="text-xs text-muted-foreground break-words">
+                              {event.details.organization}
+                            </p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <p

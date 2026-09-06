@@ -34,6 +34,7 @@ model Event {
   warningsJson String
   comment      String?
   adminComment String?
+  detailsJson  String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

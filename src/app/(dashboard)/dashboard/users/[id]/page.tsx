@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Clock,
   MessageSquare,
+  Shield,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -57,7 +58,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const userId = Number.parseInt(params.id as string, 10);
+  const userId = Number(params.id);
 
   const [user, setUser] = useState<UserResponseDto | null>(null);
   const [events, setEvents] = useState<EventResponseDto[]>([]);
@@ -100,8 +101,11 @@ export default function UserDetailPage() {
   }, [userId]);
 
   useEffect(() => {
-    if (Number.isFinite(userId)) {
+    if (Number.isInteger(userId) && userId > 0) {
       void loadData();
+    } else {
+      setError("Некорректный идентификатор пользователя");
+      setLoading(false);
     }
   }, [userId, loadData]);
 
@@ -192,9 +196,6 @@ export default function UserDetailPage() {
               <h1 className="text-2xl lg:text-3xl font-bold truncate">
                 {user.name}
               </h1>
-              <p className="text-sm text-muted-foreground truncate">
-                @{user.login}
-              </p>
             </div>
           </div>
 
@@ -264,6 +265,35 @@ export default function UserDetailPage() {
                     >
                       {user.banned ? "Забанен" : "Активен"}
                     </span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                    <Shield className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Статистика</h2>
+                    <p className="text-sm text-muted-foreground">
+                      История заявок
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Всего заявок
+                    </p>
+                    <p className="text-2xl font-bold">{events.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Последняя активность
+                    </p>
+                    <p className="text-sm">
+                      {events[0] ? formatDateTime(events[0].creationTime) : "—"}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "predev": "prisma generate && prisma migrate deploy",
+    "prebuild": "prisma generate",
+    "test": "node tests/event-requirements.test.cjs",
+    "test:integration": "npm run build && node tests/event-api.integration.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

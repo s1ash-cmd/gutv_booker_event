@@ -1,4 +1,7 @@
+import type { EventDetails } from "@/lib/eventRequirements";
+
 export interface CreateEventRequestDto {
+  details: EventDetails;
   reason: string;
   startTime: string;
   endTime: string;
@@ -6,6 +9,8 @@ export interface CreateEventRequestDto {
 }
 
 export interface EventResponseDto {
+  clientId: number;
+  details?: EventDetails | null;
   id: number;
   client: string;
   reason: string;

@@ -13,6 +13,7 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { EventResponseDto } from "@/app/models/event/event";
+import { EventRequestDetails } from "@/components/EventRequestDetails";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,12 +51,13 @@ export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const eventId = Number.parseInt(params.id as string, 10);
+  const eventId = Number(params.id);
   const isAdmin = user?.role === "Admin";
 
   const [event, setEvent] = useState<EventResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -63,36 +65,40 @@ export default function EventDetailPage() {
   const [adminComment, setAdminComment] = useState("");
 
   const loadEvent = useCallback(async () => {
+    if (!Number.isSafeInteger(eventId) || eventId <= 0) {
+      setError("Некорректный идентификатор заявки");
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const data = await eventApi.get_by_id(eventId);
       setEvent(data);
     } catch (loadError: unknown) {
-      console.error("Ошибка загрузки event заявки:", loadError);
-      setError(getErrorMessage(loadError, "Не удалось загрузить event заявку"));
+      console.error("Ошибка загрузки заявки:", loadError);
+      setError(getErrorMessage(loadError, "Не удалось загрузить заявку"));
     } finally {
       setLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
-    if (Number.isFinite(eventId)) {
-      void loadEvent();
-    }
-  }, [eventId, loadEvent]);
+    void loadEvent();
+  }, [loadEvent]);
 
   async function handleApprove() {
     try {
       setActionLoading(true);
+      setActionError(null);
       await eventApi.approve(eventId, adminComment);
       setShowApproveDialog(false);
       setAdminComment("");
       await loadEvent();
     } catch (actionError: unknown) {
-      console.error("Ошибка подтверждения event заявки:", actionError);
-      setError(
-        getErrorMessage(actionError, "Не удалось подтвердить event заявку"),
+      console.error("Ошибка подтверждения заявки:", actionError);
+      setActionError(
+        getErrorMessage(actionError, "Не удалось подтвердить заявку"),
       );
     } finally {
       setActionLoading(false);
@@ -102,14 +108,15 @@ export default function EventDetailPage() {
   async function handleCancel() {
     try {
       setActionLoading(true);
+      setActionError(null);
       await eventApi.cancel(eventId, adminComment);
       setShowCancelDialog(false);
       setAdminComment("");
       await loadEvent();
     } catch (actionError: unknown) {
-      console.error("Ошибка отмены event заявки:", actionError);
-      setError(
-        getErrorMessage(actionError, "Не удалось отменить event заявку"),
+      console.error("Ошибка отмены заявки:", actionError);
+      setActionError(
+        getErrorMessage(actionError, "Не удалось отменить заявку"),
       );
     } finally {
       setActionLoading(false);
@@ -119,13 +126,14 @@ export default function EventDetailPage() {
   async function handleComplete() {
     try {
       setActionLoading(true);
+      setActionError(null);
       await eventApi.complete(eventId);
       setShowCompleteDialog(false);
       await loadEvent();
     } catch (actionError: unknown) {
-      console.error("Ошибка завершения event заявки:", actionError);
-      setError(
-        getErrorMessage(actionError, "Не удалось завершить event заявку"),
+      console.error("Ошибка завершения заявки:", actionError);
+      setActionError(
+        getErrorMessage(actionError, "Не удалось завершить заявку"),
       );
     } finally {
       setActionLoading(false);
@@ -135,6 +143,7 @@ export default function EventDetailPage() {
   function formatDateTime(dateString: string) {
     const date = new Date(dateString);
     return date.toLocaleString("ru-RU", {
+      timeZone: "Europe/Moscow",
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -145,8 +154,8 @@ export default function EventDetailPage() {
 
   if (loading) {
     return (
-      <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-        <div className="max-w-4xl mx-auto">
+      <main className="w-full min-w-0 bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="w-full min-w-0 max-w-4xl mx-auto">
           <div className="text-center py-12">
             <div className="inline-flex items-center gap-2 text-muted-foreground">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -160,8 +169,8 @@ export default function EventDetailPage() {
 
   if (isAuthLoading) {
     return (
-      <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-        <div className="max-w-4xl mx-auto">
+      <main className="w-full min-w-0 bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="w-full min-w-0 max-w-4xl mx-auto">
           <div className="text-center py-12">
             <div className="inline-flex items-center gap-2 text-muted-foreground">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -175,8 +184,8 @@ export default function EventDetailPage() {
 
   if (error || !event) {
     return (
-      <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-        <div className="max-w-4xl mx-auto">
+      <main className="w-full min-w-0 bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="w-full min-w-0 max-w-4xl mx-auto">
           <Button
             variant="ghost"
             onClick={() => router.back()}
@@ -214,20 +223,21 @@ export default function EventDetailPage() {
   }
 
   return (
-    <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <main className="w-full min-w-0 bg-background px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
+      <div className="w-full min-w-0 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 overflow-hidden flex-1">
             <Button
               variant="ghost"
               onClick={() => router.back()}
+              aria-label="Назад"
               size="icon"
               className="shrink-0"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="overflow-hidden flex-1">
-              <h1 className="text-2xl lg:text-3xl font-bold truncate">
+              <h1 className="text-2xl lg:text-3xl font-bold break-words">
                 {event.reason}
               </h1>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -307,32 +317,44 @@ export default function EventDetailPage() {
               <div className="overflow-hidden">
                 <h2 className="text-lg font-semibold">Время</h2>
                 <p className="text-sm text-muted-foreground">
-                  Период проведения
+                  Период проведения (МСК)
                 </p>
               </div>
             </div>
             <div className="space-y-3">
               <div className="overflow-hidden">
                 <p className="text-xs text-muted-foreground mb-1">Создано</p>
-                <p className="text-sm truncate">
+                <p className="text-sm break-words">
                   {formatDateTime(event.creationTime)}
                 </p>
               </div>
               <div className="overflow-hidden">
                 <p className="text-xs text-muted-foreground mb-1">Начало</p>
-                <p className="text-sm font-medium truncate">
+                <p className="text-sm font-medium break-words">
                   {formatDateTime(event.startTime)}
                 </p>
               </div>
               <div className="overflow-hidden">
                 <p className="text-xs text-muted-foreground mb-1">Окончание</p>
-                <p className="text-sm font-medium truncate">
+                <p className="text-sm font-medium break-words">
                   {formatDateTime(event.endTime)}
                 </p>
               </div>
             </div>
           </div>
         </div>
+
+        {event.details && (
+          <EventRequestDetails
+            key={event.id}
+            event={event}
+            canEditContentList={
+              (isAdmin || String(event.clientId) === user?.id) &&
+              (event.status === "Pending" || event.status === "Approved")
+            }
+            onUpdate={setEvent}
+          />
+        )}
 
         {(event.comment || event.adminComment) && (
           <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
@@ -377,7 +399,11 @@ export default function EventDetailPage() {
             <h2 className="text-lg font-semibold mb-4">Действия</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <Button
-                onClick={() => setShowApproveDialog(true)}
+                onClick={() => {
+                  setActionError(null);
+                  setAdminComment("");
+                  setShowApproveDialog(true);
+                }}
                 disabled={actionLoading}
                 className="w-full"
               >
@@ -386,7 +412,11 @@ export default function EventDetailPage() {
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => setShowCancelDialog(true)}
+                onClick={() => {
+                  setActionError(null);
+                  setAdminComment("");
+                  setShowCancelDialog(true);
+                }}
                 disabled={actionLoading}
                 className="w-full"
               >
@@ -401,7 +431,11 @@ export default function EventDetailPage() {
           <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
             <h2 className="text-lg font-semibold mb-4">Действия</h2>
             <Button
-              onClick={() => setShowCompleteDialog(true)}
+              onClick={() => {
+                setActionError(null);
+                setAdminComment("");
+                setShowCompleteDialog(true);
+              }}
               disabled={actionLoading}
               className="w-full sm:w-auto"
             >
@@ -415,16 +449,35 @@ export default function EventDetailPage() {
           <>
             <Dialog
               open={showApproveDialog}
-              onOpenChange={setShowApproveDialog}
+              onOpenChange={(open) => {
+                if (!actionLoading) {
+                  setShowApproveDialog(open);
+                  setActionError(null);
+                  if (!open) setAdminComment("");
+                }
+              }}
             >
-              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+              <DialogContent
+                showCloseButton={!actionLoading}
+                className="max-w-[calc(100vw-2rem)] sm:max-w-lg"
+              >
                 <DialogHeader>
                   <DialogTitle>Подтвердить заявку</DialogTitle>
                   <DialogDescription>
                     Добавьте комментарий для пользователя, если он нужен
                   </DialogDescription>
                 </DialogHeader>
+                {actionError && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+                  >
+                    {actionError}
+                  </p>
+                )}
                 <Textarea
+                  aria-label="Комментарий администратора"
+                  disabled={actionLoading}
                   placeholder="Комментарий администратора..."
                   value={adminComment}
                   onChange={(e) => setAdminComment(e.target.value)}
@@ -454,15 +507,37 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+            <Dialog
+              open={showCancelDialog}
+              onOpenChange={(open) => {
+                if (!actionLoading) {
+                  setShowCancelDialog(open);
+                  setActionError(null);
+                  if (!open) setAdminComment("");
+                }
+              }}
+            >
+              <DialogContent
+                showCloseButton={!actionLoading}
+                className="max-w-[calc(100vw-2rem)] sm:max-w-lg"
+              >
                 <DialogHeader>
                   <DialogTitle>Отменить заявку</DialogTitle>
                   <DialogDescription>
                     Укажите причину отмены, если хотите пояснить решение
                   </DialogDescription>
                 </DialogHeader>
+                {actionError && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+                  >
+                    {actionError}
+                  </p>
+                )}
                 <Textarea
+                  aria-label="Комментарий администратора"
+                  disabled={actionLoading}
                   placeholder="Комментарий администратора..."
                   value={adminComment}
                   onChange={(e) => setAdminComment(e.target.value)}
@@ -495,16 +570,33 @@ export default function EventDetailPage() {
 
             <Dialog
               open={showCompleteDialog}
-              onOpenChange={setShowCompleteDialog}
+              onOpenChange={(open) => {
+                if (!actionLoading) {
+                  setShowCompleteDialog(open);
+                  setActionError(null);
+                  if (!open) setAdminComment("");
+                }
+              }}
             >
-              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+              <DialogContent
+                showCloseButton={!actionLoading}
+                className="max-w-[calc(100vw-2rem)] sm:max-w-lg"
+              >
                 <DialogHeader>
                   <DialogTitle>Завершить заявку</DialogTitle>
                   <DialogDescription>
-                    Подтвердите завершение event. После этого заявка перейдёт в
-                    статус завершённой.
+                    Подтвердите завершение мероприятия. После этого заявка
+                    перейдёт в статус завершённой.
                   </DialogDescription>
                 </DialogHeader>
+                {actionError && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+                  >
+                    {actionError}
+                  </p>
+                )}
                 <DialogFooter className="flex-col sm:flex-row gap-2">
                   <Button
                     variant="outline"
