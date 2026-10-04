@@ -39,3 +39,7 @@ export function formatBackendErrorDetails(errors: unknown): string | null {
   const messages = Array.from(new Set(collectTextMessages(errors)));
   return messages.length > 0 ? messages.join("\n") : null;
 }
+
+export function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}

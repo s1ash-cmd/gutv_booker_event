@@ -1,38 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { registrationSchema } from "@/lib/profileValidation";
+import { authRateLimit } from "@/lib/rateLimit";
+import { readJson } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
 import { UserService } from "@/services/userService";
-
-const userService = new UserService();
-
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const createUserRequest = {
-      login: body.login,
-      password: body.password,
-      name: body.name,
-    };
-
-    if (
-      !createUserRequest.login ||
-      !createUserRequest.password ||
-      !createUserRequest.name ||
-      createUserRequest.password.length < 8
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Логин и имя обязательны. Пароль обязателен и минимум 8 символов.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const user = await userService.createUser(createUserRequest);
-    return NextResponse.json(user);
+    const limited = await authRateLimit("register", 20);
+    if (limited) return limited;
+    const body = registrationSchema.parse(await readJson(request));
+    const user = await new UserService().createUser(body);
+    return NextResponse.json(user, { status: 201 });
   } catch (error) {
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    if (
+      error instanceof Error &&
+      (error.message === "Пользователь с таким логином уже существует" ||
+        ("code" in error && error.code === "P2002"))
+    )
+      return NextResponse.json(
+        { error: "Пользователь с таким логином уже существует" },
+        { status: 409 },
+      );
+    return routeError(error);
   }
 }

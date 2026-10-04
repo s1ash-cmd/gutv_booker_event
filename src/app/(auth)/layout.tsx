@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AuthProvider>
             <main className="flex min-h-dvh w-full flex-1 items-center justify-center py-4">
               {children}
-              <Analytics />
+              {process.env.VERCEL === "1" && <Analytics />}
             </main>
           </AuthProvider>
         </ClientThemeProvider>

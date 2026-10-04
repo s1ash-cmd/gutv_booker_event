@@ -1,6 +1,18 @@
-export const getAvatarUrl = (login: string, role?: string) => {
+import type { CSSProperties } from "react";
+export function getAvatarGlowStyle(
+  role?: string | null,
+): CSSProperties & { "--avatar-glow-color": string } {
+  return { "--avatar-glow-color": role === "Admin" ? "#a855f7" : "#38bdf8" };
+}
+export const getAvatarUrl = (
+  login: string,
+  role?: string,
+  avatarSeed?: string | null,
+  avatarUrl?: string | null,
+) => {
+  if (avatarUrl) return avatarUrl;
   const params = new URLSearchParams({
-    seed: `${login}GUtv 52`,
+    seed: avatarSeed || `${login}GUtv 52`,
     size: "128",
 
     backgroundColor:

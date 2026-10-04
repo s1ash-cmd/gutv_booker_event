@@ -1,146 +1,97 @@
 "use client";
-
-import { AlertCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getAvatarUrl } from "@/lib/avatar";
-import { getRoleLabel, isAdminRole } from "@/lib/roles";
+import { ErrorMessage } from "@/components/ErrorMessage";
+import { AvatarEditor } from "@/components/profile/AvatarEditor";
+import { ProfileCard } from "@/components/profile/ProfileCard";
+import styles from "@/components/profile/ProfileLayout.module.css";
+import { RepresentativePanel } from "@/components/profile/RepresentativePanel";
+import { SessionsPanel } from "@/components/profile/SessionsPanel";
+import { useAuth } from "@/contexts/AuthContext";
 import { userApi } from "@/lib/userApi";
-import { cn } from "@/lib/utils";
-
-export default function Home() {
+import { getErrorMessage } from "@/lib/userFacingMessages";
+export default function ProfilePage() {
+  const { setUser } = useAuth();
   const [userData, setUserData] = useState<UserResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const version = useRef(0);
+  const updateUser = (data: UserResponseDto) => {
+    version.current += 1;
+    setUserData(data);
+    setUser({ ...data, id: String(data.id) });
+  };
   useEffect(() => {
-    const fetchUser = async () => {
+    let active = true;
+    const load = async () => {
+      const request = ++version.current;
+      const current = () => active && version.current === request;
       try {
-        setLoading(true);
         const data = await userApi.get_me();
-        setUserData(data);
+        if (current()) {
+          setUserData(data);
+          setUser({ ...data, id: String(data.id) });
+          setError(null);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки данных");
+        if (current())
+          setError(getErrorMessage(err, "Не удалось загрузить профиль"));
       } finally {
-        setLoading(false);
+        if (current()) setLoading(false);
       }
     };
-
-    fetchUser();
-  }, []);
-
-  const getInitials = (name: string) => {
-    return name.substring(0, 1).toUpperCase();
-  };
-
-  if (loading) {
+    void load();
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+    };
+  }, [setUser]);
+  if (loading)
     return (
-      <main className="flex items-center justify-center min-h-screen">
-        <output
-          aria-label="Загрузка профиля"
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"
-        />
-      </main>
+      <output
+        className="flex items-center justify-center min-h-screen"
+        aria-live="polite"
+      >
+        Загрузка профиля…
+      </output>
     );
-  }
-
-  if (error || !userData) {
+  if (!userData)
     return (
-      <main className="flex items-center justify-center min-h-screen p-6">
-        <div className="text-center" role="alert">
-          <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
-          <p className="text-muted-foreground">
-            {error || "Пользователь не найден"}
-          </p>
-        </div>
-      </main>
+      <div className="p-6">
+        <ErrorMessage message={error ?? "Пользователь не найден"} />
+      </div>
     );
-  }
-
-  const isAdmin = isAdminRole(userData.role);
-
   return (
-    <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="overflow-hidden">
-          <h1 className="text-2xl lg:text-3xl font-bold truncate">
-            {userData.name}
-          </h1>
-        </div>
-
-        <div className="grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
-          <div className="space-y-6">
-            <div className="bg-card border border-border rounded-xl p-6">
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  {isAdmin && (
-                    <div className="absolute -inset-0.5 bg-linear-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
-                  )}
-                  <Avatar className="h-24 w-24 relative border-2 border-background">
-                    <AvatarImage
-                      src={getAvatarUrl(userData.login, userData.role)}
-                      alt={userData.login}
-                    />
-                    <AvatarFallback
-                      className={cn(
-                        "text-2xl font-bold",
-                        isAdmin && "bg-primary text-primary-foreground",
-                      )}
-                    >
-                      {getInitials(userData.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Ник
-                  </span>
-                  <span className="text-base font-semibold text-right wrap-break-words">
-                    {userData.name}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Логин
-                  </span>
-                  <span className="text-base font-semibold text-right wrap-break-words">
-                    {userData.login}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Роль
-                  </span>
-                  <span className="text-base font-semibold text-right">
-                    {getRoleLabel(userData.role)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-3 gap-4">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Статус
-                  </span>
-                  <span
-                    className={cn(
-                      "text-base font-semibold text-right",
-                      userData.banned
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-green-600 dark:text-green-400",
-                    )}
-                  >
-                    {userData.banned ? "Заблокирован" : "Активен"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div
+      className={`${styles.page} pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8`}
+    >
+      <div className={styles.pageTop}>
+        <span className={styles.eyebrow}>Личный кабинет / Профиль</span>
+        <Link href="/dashboard/events/my" className={styles.simpleLink}>
+          Мои заявки <ArrowUpRight size={15} />
+        </Link>
+      </div>
+      {error && <ErrorMessage message={error} className="mb-4" />}
+      <div className={styles.grid}>
+        <ProfileCard
+          user={userData}
+          onAvatarChange={() => setShowAvatarDialog(true)}
+        />
+        <div className={styles.panels}>
+          <RepresentativePanel user={userData} onSaved={updateUser} />
+          <SessionsPanel />
         </div>
       </div>
-    </main>
+      <AvatarEditor
+        user={userData}
+        open={showAvatarDialog}
+        onOpenChange={setShowAvatarDialog}
+        onSaved={updateUser}
+      />
+    </div>
   );
 }

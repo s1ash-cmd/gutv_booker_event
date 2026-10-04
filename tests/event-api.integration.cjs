@@ -51,9 +51,24 @@ async function main() {
     logs += d;
   });
   const tokens = {};
+  db.prepare(
+    "UPDATE Users SET organization=?, representativeContacts=?, name=? WHERE id=1",
+  ).run("Test faculty", "@test", "Test person");
   try {
-    for (let id = 1; id <= 4; id++)
+    for (let id = 1; id <= 4; id++) {
+      const sessionId = crypto.randomUUID();
+      db.prepare(
+        "INSERT INTO UserSession (id,userId,refreshTokenHash,createdAt,lastUsedAt,expiresAt) VALUES (?,?,?,?,?,?)",
+      ).run(
+        sessionId,
+        id,
+        crypto.randomBytes(32).toString("hex"),
+        new Date().toISOString(),
+        new Date().toISOString(),
+        new Date(Date.now() + 7 * 86400000).toISOString(),
+      );
       tokens[id] = await new SignJWT({
+        sid: sessionId,
         role: id === 3 ? "Admin" : "Organization",
       })
         .setProtectedHeader({ alg: "HS256" })
@@ -62,6 +77,7 @@ async function main() {
         .setAudience("integration")
         .setExpirationTime("30m")
         .sign(new TextEncoder().encode(env.JWT_SECRET));
+    }
     let ready = false;
     for (let i = 0; i < 80; i++) {
       try {
@@ -136,7 +152,7 @@ async function main() {
     assert.equal((await request("get_by_id/1")).details, null);
     await request(`get_by_id/${created.id}`, { id: 2, status: 400 });
     await request("create", { id: 0, method: "POST", body, status: 401 });
-    await request("create", { id: 4, method: "POST", body, status: 400 });
+    await request("create", { id: 4, method: "POST", body, status: 401 });
     const invalid = await request("create", {
       method: "POST",
       body: {
@@ -242,8 +258,362 @@ async function main() {
       body: { contentList: "Too late" },
       status: 400,
     });
+    // Exercise real account/session routes, without touching the working database.
+    const api = async (
+      route,
+      { token, method = "GET", body, status = 200, headers = {} } = {},
+    ) => {
+      const response = await fetch(`http://localhost:${port}/api/${route}`, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
+        ...(body !== undefined
+          ? {
+              body:
+                typeof body === "string" || Buffer.isBuffer(body)
+                  ? body
+                  : JSON.stringify(body),
+            }
+          : {}),
+      });
+      const result = await response.json();
+      assert.equal(
+        response.status,
+        status,
+        `${route}: ${JSON.stringify(result)}`,
+      );
+      return result;
+    };
+    const registration = {
+      login: "new-user",
+      password: "Password-123",
+      name: "Иванов Иван Иванович",
+      organization: "Совет студентов",
+      representativeContacts: "@ivanov",
+    };
+    await api("users/create", {
+      method: "POST",
+      body: { ...registration, organization: "" },
+      status: 400,
+    });
+    await api("users/create", {
+      method: "POST",
+      body: { ...registration, password: 123456789 },
+      status: 400,
+    });
+    const account = await api("users/create", {
+      method: "POST",
+      body: { ...registration, role: 3 },
+      status: 201,
+    });
+    assert.equal(account.role, "Organization");
+    assert.equal(account.organization, registration.organization);
+    assert.ok(!("passwordHash" in account));
+    assert.ok(
+      db
+        .prepare("SELECT passwordHash FROM Users WHERE id=?")
+        .get(account.id)
+        .passwordHash.startsWith("scrypt:"),
+    );
+    await api("users/create", {
+      method: "POST",
+      body: registration,
+      status: 409,
+    });
+    await api("auth/login", {
+      method: "POST",
+      body: { login: null, password: [] },
+      status: 400,
+    });
+    await api("auth/login", {
+      method: "POST",
+      body: { login: registration.login, password: "wrongpass" },
+      status: 401,
+    });
+    const login = () =>
+      api("auth/login", { method: "POST", body: registration });
+    const deviceA = await login();
+    const deviceB = await login();
+    const devices = await api("auth/sessions", { token: deviceA.accessToken });
+    assert.equal(devices.length, 2);
+    assert.equal(devices.filter((s) => s.isCurrent).length, 1);
+    assert.ok(devices.every((s) => !("refreshTokenHash" in s)));
+    assert.ok(
+      !db
+        .prepare("SELECT 1 FROM UserSession WHERE refreshTokenHash=?")
+        .get(deviceA.refreshToken),
+    );
+    const rotatedA = await api("auth/refresh", {
+      method: "POST",
+      body: { refreshToken: deviceA.refreshToken },
+    });
+    await api("auth/refresh", {
+      method: "POST",
+      body: { refreshToken: deviceA.refreshToken },
+      status: 401,
+    });
+    await api("users/get_me", { token: deviceB.accessToken });
+    const foreign = (await api("auth/sessions", { token: tokens[2] }))[0];
+    await api(`auth/sessions/${foreign.id}`, {
+      method: "DELETE",
+      token: deviceB.accessToken,
+      status: 404,
+    });
+    const revoked = (
+      await api("auth/sessions", { token: deviceB.accessToken })
+    ).find((s) => !s.isCurrent);
+    await api(`auth/sessions/${revoked.id}`, {
+      method: "DELETE",
+      token: deviceB.accessToken,
+    });
+    await api("users/get_me", { token: rotatedA.accessToken, status: 401 });
+    await api("auth/refresh", {
+      method: "POST",
+      body: { refreshToken: rotatedA.refreshToken },
+      status: 401,
+    });
+    await api("users/profile", {
+      method: "PATCH",
+      token: deviceB.accessToken,
+      body: { ...registration, organization: "Новая организация", role: 3 },
+    });
+    assert.equal(
+      (await api("users/get_me", { token: deviceB.accessToken })).role,
+      "Organization",
+    );
+    const withProfile = await api("event/create", {
+      token: deviceB.accessToken,
+      method: "POST",
+      body: {
+        ...body,
+        details: {
+          ...details,
+          organization: "FORGED",
+          representativeName: "FORGED",
+          representativeContacts: "FORGED",
+        },
+      },
+    });
+    assert.equal(withProfile.details.organization, "Новая организация");
+    assert.equal(withProfile.details.representativeName, registration.name);
+    assert.equal(
+      withProfile.details.representativeContacts,
+      registration.representativeContacts,
+    );
+    await api("users/profile", {
+      method: "PATCH",
+      token: deviceB.accessToken,
+      body: registration,
+    });
+    assert.equal(
+      (
+        await api(`event/get_by_id/${withProfile.id}`, {
+          token: deviceB.accessToken,
+        })
+      ).details.organization,
+      "Новая организация",
+    );
+    await api(`event/get_by_id/${withProfile.id}junk`, {
+      token: deviceB.accessToken,
+      status: 400,
+    });
+    await api("users/get_all", { token: deviceB.accessToken, status: 403 });
+    const generated = await api("users/avatar", {
+      token: deviceB.accessToken,
+      method: "PATCH",
+    });
+    assert.ok(generated.avatarSeed);
+    assert.equal(generated.avatarUrl, null);
+    await api("users/avatar", {
+      token: deviceB.accessToken,
+      method: "POST",
+      body: "<svg><script>alert(1)</script></svg>",
+      status: 400,
+    });
+    const photo = await require("sharp")({
+      create: { width: 8, height: 8, channels: 3, background: "#3355aa" },
+    })
+      .png()
+      .toBuffer();
+    const withPhoto = await api("users/avatar", {
+      method: "POST",
+      token: deviceB.accessToken,
+      body: photo,
+      headers: { "Content-Type": "image/png" },
+    });
+    assert.ok(withPhoto.avatarUrl.startsWith("data:image/webp;base64,"));
+    const metadata = await require("sharp")(
+      Buffer.from(withPhoto.avatarUrl.split(",")[1], "base64"),
+    ).metadata();
+    assert.equal(metadata.width, 512);
+    assert.equal(metadata.height, 512);
+    assert.equal(metadata.format, "webp");
+    await api("users/avatar", { method: "DELETE", token: deviceB.accessToken });
+    assert.equal(
+      (await api("users/get_me", { token: deviceB.accessToken })).avatarUrl,
+      null,
+    );
+    await api("users/avatar", {
+      method: "POST",
+      token: deviceB.accessToken,
+      body: Buffer.alloc(5 * 1024 * 1024 + 1),
+      status: 413,
+    });
+    // Reject oversized/malformed bodies and invalid admin input.
+    await api("event/create", {
+      token: deviceB.accessToken,
+      method: "POST",
+      body: "{broken",
+      status: 400,
+    });
+    await api("users/profile", {
+      token: deviceB.accessToken,
+      method: "PATCH",
+      body: JSON.stringify({ ...registration, name: "x".repeat(300000) }),
+      status: 400,
+    });
+    await api(`event/approve/${withProfile.id}`, {
+      token: tokens[3],
+      method: "PATCH",
+      body: { adminComment: {} },
+      status: 400,
+    });
+    await api(`event/approve/${withProfile.id}`, {
+      token: tokens[3],
+      method: "PATCH",
+      body: "{broken",
+      status: 400,
+    });
+    // Concurrent moderation must not resurrect a cancelled request.
+    const moderated = await request("create", { method: "POST", body });
+    const moderation = await Promise.all(
+      ["approve", "cancel"].map((action) =>
+        fetch(`http://localhost:${port}/api/event/${action}/${moderated.id}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${tokens[3]}`,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        }),
+      ),
+    );
+    assert.ok(moderation.every((r) => [200, 400, 409].includes(r.status)));
+    assert.equal(
+      (await request(`get_by_id/${moderated.id}`)).status,
+      "Cancelled",
+    );
+    const ownPage = await api("event/list?scope=my&pageSize=1&status=all", {
+      token: deviceB.accessToken,
+    });
+    assert.equal(ownPage.items.length, 1);
+    assert.ok(ownPage.total >= 1);
+    assert.ok(ownPage.items.every((event) => event.clientId === account.id));
+    const nextPage = await api(
+      "event/list?scope=my&pageSize=1&page=2&status=all",
+      { token: deviceB.accessToken },
+    );
+    assert.ok(nextPage.items.every((event) => event.clientId === account.id));
+    if (ownPage.total > 1)
+      assert.notEqual(nextPage.items[0].id, ownPage.items[0].id);
+    const cyrillic = await api(
+      `event/list?scope=my&query=${encodeURIComponent("ИВАНОВ")}`,
+      { token: deviceB.accessToken },
+    );
+    assert.ok(cyrillic.total >= 1);
+    assert.ok(
+      cyrillic.items.every((event) =>
+        event.details.representativeName.includes("Иванов"),
+      ),
+    );
+    await api("event/list?scope=all", {
+      token: deviceB.accessToken,
+      status: 403,
+    });
+    await api("event/list?scope=user&userId=1", {
+      token: deviceB.accessToken,
+      status: 403,
+    });
+    await api("event/list?pageSize=101", {
+      token: deviceB.accessToken,
+      status: 400,
+    });
+    const scoped = await api(
+      `event/list?scope=user&userId=${account.id}&status=all`,
+      { token: tokens[3] },
+    );
+    assert.equal(scoped.total, ownPage.total);
+    assert.ok(scoped.items.every((event) => event.clientId === account.id));
+    const cancelledPage = await api("event/list?scope=all&status=Cancelled", {
+      token: tokens[3],
+    });
+    assert.ok(
+      cancelledPage.items.every((event) => event.status === "Cancelled"),
+    );
+    await api("auth/logout_all", {
+      method: "POST",
+      token: deviceB.accessToken,
+    });
+    await api("users/get_me", { token: deviceB.accessToken, status: 401 });
+    await api("auth/refresh", {
+      method: "POST",
+      body: { refreshToken: deviceB.refreshToken },
+      status: 401,
+    });
+    const bannedDevice = await login();
+    await api(`users/ban/${account.id}`, { token: tokens[3], method: "PATCH" });
+    await api("users/get_me", { token: bannedDevice.accessToken, status: 401 });
+    await api("auth/refresh", {
+      method: "POST",
+      body: { refreshToken: bannedDevice.refreshToken },
+      status: 401,
+    });
+    await api(`users/unban/${account.id}`, {
+      token: tokens[3],
+      method: "PATCH",
+    });
+    await api("users/get_me", { token: bannedDevice.accessToken, status: 401 });
+    const logoutDevice = await login();
+    await api("auth/logout", {
+      token: logoutDevice.accessToken,
+      method: "POST",
+    });
+    await api("users/get_me", { token: logoutDevice.accessToken, status: 401 });
+    // Existing SHA-256 passwords migrate on successful authentication.
+    const oldSalt = "legacy-salt";
+    db.prepare("UPDATE Users SET passwordHash=?,salt=? WHERE id=2").run(
+      crypto
+        .createHash("sha256")
+        .update(`legacy-password${oldSalt}`)
+        .digest("base64"),
+      oldSalt,
+    );
+    await api("auth/login", {
+      method: "POST",
+      body: { login: "other", password: "legacy-password" },
+    });
+    assert.ok(
+      db
+        .prepare("SELECT passwordHash FROM Users WHERE id=2")
+        .get()
+        .passwordHash.startsWith("scrypt:"),
+    );
+    for (let attempt = 0; attempt < 15; attempt++)
+      await api("auth/login", {
+        method: "POST",
+        body: { login: "missing-user", password: "wrongpass" },
+        status: 401,
+      });
+    await api("auth/login", {
+      method: "POST",
+      body: { login: "missing-user", password: "wrongpass" },
+      status: 429,
+    });
     console.log(
-      "API integration passed: four request types, multi-session persistence, legacy records, deadlines, permissions, content-list updates and moderation.",
+      "API integration passed: event types/deadlines/permissions, profile snapshots, independent devices, refresh rotation/revocation, bans, legacy passwords, avatar validation, rate limits and concurrent moderation.",
     );
   } finally {
     server.kill("SIGTERM");

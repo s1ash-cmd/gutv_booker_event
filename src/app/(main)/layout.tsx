@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
             <main className="flex-1 flex flex-col">
               {children}
-              <Analytics />
+              {process.env.VERCEL === "1" && <Analytics />}
             </main>
 
             <Footer />

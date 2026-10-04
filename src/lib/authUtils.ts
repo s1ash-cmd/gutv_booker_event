@@ -4,7 +4,9 @@ import { authService } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function getUserFromToken(request: NextRequest) {
-  const token = request.headers.get("authorization")?.split(" ")[1];
+  const token = request.headers
+    .get("authorization")
+    ?.match(/^Bearer (\S+)$/i)?.[1];
 
   if (!token) {
     throw new Error("Unauthorized");
@@ -12,9 +14,9 @@ export async function getUserFromToken(request: NextRequest) {
 
   try {
     const payload = await authService.verifyToken(token);
-    const userId = Number.parseInt(String(payload.sub ?? ""), 10);
+    const userId = Number(payload.sub);
 
-    if (!Number.isFinite(userId) || userId <= 0) {
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
       throw new Error("Invalid token");
     }
 
@@ -22,7 +24,18 @@ export async function getUserFromToken(request: NextRequest) {
       where: { id: userId },
     });
 
-    if (!currentUser) {
+    const session =
+      typeof payload.sid === "string"
+        ? await prisma.userSession.findUnique({ where: { id: payload.sid } })
+        : null;
+    if (
+      !currentUser ||
+      currentUser.banned ||
+      !session ||
+      session.userId !== userId ||
+      session.revokedAt ||
+      session.expiresAt <= new Date()
+    ) {
       throw new Error("Unauthorized");
     }
 
@@ -30,6 +43,7 @@ export async function getUserFromToken(request: NextRequest) {
 
     return {
       id: currentUser.id,
+      sessionId: session.id,
       role: currentUser.role,
       roleName,
       login: currentUser.login,

@@ -8,6 +8,7 @@ import {
   contentListDeadline,
   eventDetailsSchema,
   moscowDate,
+  requestTypeLabels,
   validateEventDetails,
 } from "@/lib/eventRequirements";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,27 @@ function mapEvent(event: Event): EventResponseDto {
   };
 }
 
+function eventSearchText(
+  event: Pick<
+    Event,
+    "client" | "reason" | "comment" | "adminComment" | "detailsJson"
+  >,
+) {
+  const details = parseDetails(event.detailsJson);
+  return [
+    event.client,
+    event.reason,
+    event.comment,
+    event.adminComment,
+    details?.organization,
+    details?.representativeName,
+    details ? requestTypeLabels[details.requestType] : null,
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .toLocaleLowerCase("ru-RU");
+}
+
 function ensureValidInput(input: CreateEventRequestDto) {
   const { details, errors } = validateEventDetails(input?.details);
   if (typeof input?.reason !== "string" || !input.reason.trim())
@@ -100,8 +122,6 @@ export class EventService {
     input: CreateEventRequestDto,
     currentUser: { id: number },
   ): Promise<EventResponseDto> {
-    const { startTime, endTime, details } = ensureValidInput(input);
-
     const user = await prisma.user.findUnique({
       where: { id: currentUser.id },
     });
@@ -111,6 +131,16 @@ export class EventService {
     }
 
     ensureCanCreateEvent(user);
+    // Only profile data can identify the representative; preserve a historical snapshot.
+    const { startTime, endTime, details } = ensureValidInput({
+      ...input,
+      details: {
+        ...input?.details,
+        organization: user.organization,
+        representativeName: user.name,
+        representativeContacts: user.representativeContacts,
+      },
+    });
 
     const warnings: Record<string, unknown> = {};
     if (details.requestType === "trip" && !details.contentList) {
@@ -134,6 +164,94 @@ export class EventService {
     });
 
     return mapEvent(event);
+  }
+
+  async listEvents(options: {
+    userId?: number;
+    page: number;
+    pageSize: number;
+    status?: string;
+    query: string;
+    sort: "createdAsc" | "createdDesc";
+  }) {
+    // Backfill legacy Unicode search text in bounded batches: SQLite lower() does not case-fold Cyrillic.
+    while (true) {
+      const legacy = await prisma.event.findMany({
+        where: { searchText: null },
+        take: 100,
+      });
+      if (!legacy.length) break;
+      await prisma.$transaction(
+        legacy.map((event) =>
+          prisma.event.updateMany({
+            where: {
+              id: event.id,
+              searchText: null,
+              adminComment: event.adminComment,
+              comment: event.comment,
+              detailsJson: event.detailsJson,
+            },
+            data: { searchText: eventSearchText(event) },
+          }),
+        ),
+      );
+    }
+    const status = options.status
+      ? statusNames.indexOf(options.status as (typeof statusNames)[number])
+      : -1;
+    const query = options.query.trim().toLocaleLowerCase("ru-RU");
+    const id = /^\d+$/.test(query) ? Number(query) : null;
+    const where = {
+      ...(options.userId ? { userId: options.userId } : {}),
+      ...(status >= 0 ? { status } : {}),
+      ...(query
+        ? {
+            OR: [
+              { searchText: { contains: query } },
+              ...(id && Number.isSafeInteger(id) ? [{ id }] : []),
+            ],
+          }
+        : {}),
+    };
+    return prisma.$transaction(async (tx) => {
+      const total = await tx.event.count({ where });
+      const totalPages = Math.max(1, Math.ceil(total / options.pageSize));
+      const page = Math.min(options.page, totalPages);
+      const grouped = await tx.event.groupBy({
+        by: ["status"],
+        where: options.userId ? { userId: options.userId } : {},
+        _count: { _all: true },
+      });
+      const summary = {
+        total: 0,
+        Pending: 0,
+        Cancelled: 0,
+        Approved: 0,
+        Completed: 0,
+      };
+      for (const row of grouped) {
+        const name = statusNames[row.status];
+        if (name) summary[name] = row._count._all;
+        summary.total += row._count._all;
+      }
+      const events = await tx.event.findMany({
+        where,
+        take: options.pageSize,
+        skip: (page - 1) * options.pageSize,
+        orderBy: [
+          { creationTime: options.sort === "createdAsc" ? "asc" : "desc" },
+          { id: options.sort === "createdAsc" ? "asc" : "desc" },
+        ],
+      });
+      return {
+        items: events.map(mapEvent),
+        summary,
+        total,
+        page,
+        pageSize: options.pageSize,
+        totalPages,
+      };
+    });
   }
 
   async updateContentList(
@@ -229,9 +347,11 @@ export class EventService {
   }
 
   async getEventsByStatus(status: string): Promise<EventResponseDto[]> {
-    const statusValue = EventStatus[status as keyof typeof EventStatus];
+    const statusValue = statusNames.indexOf(
+      status as (typeof statusNames)[number],
+    );
 
-    if (statusValue === undefined) {
+    if (statusValue < 0) {
       throw new Error("Некорректный статус");
     }
 
@@ -243,70 +363,65 @@ export class EventService {
     return events.map(mapEvent);
   }
 
-  async approveEvent(id: number, adminComment?: string | null) {
-    const event = await prisma.event.findUnique({ where: { id } });
-
-    if (!event) {
-      throw new Error(`Событие с ID ${id} не найдено`);
-    }
-
-    if (event.status !== EventStatus.Pending) {
-      throw new Error("Заявка недоступна для обработки");
-    }
-
-    const updated = await prisma.event.update({
-      where: { id },
-      data: {
-        status: EventStatus.Approved,
-        adminComment: adminComment?.trim() || null,
-      },
+  private async moderateEvent(
+    id: number,
+    actor: { id: number; sessionId: string },
+    status: EventStatus,
+    adminComment?: string | null,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: actor.id } });
+      const session = await tx.userSession.findUnique({
+        where: { id: actor.sessionId },
+      });
+      if (
+        !user ||
+        user.banned ||
+        !session ||
+        session.userId !== user.id ||
+        session.revokedAt ||
+        session.expiresAt <= new Date()
+      )
+        throw new Error("Unauthorized");
+      if (user.role !== UserRole.Admin) throw new Error("Forbidden");
+      const event = await tx.event.findUnique({ where: { id } });
+      if (!event) throw new Error("Заявка не найдена");
+      const allowed =
+        status === EventStatus.Approved
+          ? [EventStatus.Pending]
+          : status === EventStatus.Completed
+            ? [EventStatus.Approved]
+            : [EventStatus.Pending, EventStatus.Approved];
+      if (!allowed.includes(event.status))
+        throw new Error("Статус заявки изменился. Обновите страницу");
+      const updated = await tx.event.update({
+        where: { id, status: { in: allowed } },
+        data: {
+          status,
+          ...(status !== EventStatus.Completed
+            ? { adminComment: adminComment?.trim() || null, searchText: null }
+            : {}),
+        },
+      });
+      return mapEvent(updated);
     });
-
-    return mapEvent(updated);
   }
 
-  async cancelEvent(id: number, adminComment?: string | null) {
-    const event = await prisma.event.findUnique({ where: { id } });
-
-    if (!event) {
-      throw new Error(`Событие с ID ${id} не найдено`);
-    }
-
-    if (event.status === EventStatus.Cancelled) {
-      throw new Error("Эта заявка уже отменена");
-    }
-
-    if (event.status === EventStatus.Completed) {
-      throw new Error("Завершенную заявку отменить нельзя");
-    }
-
-    const updated = await prisma.event.update({
-      where: { id },
-      data: {
-        status: EventStatus.Cancelled,
-        adminComment: adminComment?.trim() || null,
-      },
-    });
-
-    return mapEvent(updated);
+  async approveEvent(
+    id: number,
+    adminComment: string | null | undefined,
+    actor: { id: number; sessionId: string },
+  ) {
+    return this.moderateEvent(id, actor, EventStatus.Approved, adminComment);
   }
-
-  async completeEvent(id: number) {
-    const event = await prisma.event.findUnique({ where: { id } });
-
-    if (!event) {
-      throw new Error(`Событие с ID ${id} не найдено`);
-    }
-
-    if (event.status !== EventStatus.Approved) {
-      throw new Error("Завершить можно только одобренную заявку");
-    }
-
-    const updated = await prisma.event.update({
-      where: { id },
-      data: { status: EventStatus.Completed },
-    });
-
-    return mapEvent(updated);
+  async cancelEvent(
+    id: number,
+    adminComment: string | null | undefined,
+    actor: { id: number; sessionId: string },
+  ) {
+    return this.moderateEvent(id, actor, EventStatus.Cancelled, adminComment);
+  }
+  async completeEvent(id: number, actor: { id: number; sessionId: string }) {
+    return this.moderateEvent(id, actor, EventStatus.Completed);
   }
 }

@@ -13,32 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { authApi } from "@/lib/authApi";
-
-function mapJwtToUser(token: string) {
-  const base64Url = token.split(".")[1];
-  let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-
-  while (base64.length % 4 !== 0) {
-    base64 += "=";
-  }
-
-  const payload = JSON.parse(atob(base64));
-
-  return {
-    id: String(payload.sub ?? ""),
-    login: payload.unique_name ?? payload.login ?? "",
-    name:
-      payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
-      payload.name ??
-      payload.unique_name ??
-      payload.login ??
-      "",
-    role:
-      payload.role ??
-      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-      "User",
-  };
-}
+import { userApi } from "@/lib/userApi";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -91,10 +66,8 @@ export function LoginForm() {
 
       await authApi.login(login, password);
 
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        setUser(mapJwtToUser(token));
-      }
+      const profile = await userApi.get_me();
+      setUser({ ...profile, id: String(profile.id) });
 
       router.push("/");
     } catch (error) {

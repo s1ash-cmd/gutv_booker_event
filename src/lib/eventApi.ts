@@ -4,7 +4,41 @@ import type {
 } from "@/app/models/event/event";
 import { authenticatedApiRequest } from "./authApi";
 
+export type EventPage = {
+  summary: {
+    total: number;
+    Pending: number;
+    Cancelled: number;
+    Approved: number;
+    Completed: number;
+  };
+  items: EventResponseDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
 export const eventApi = {
+  list: async (options: {
+    scope: "my" | "all" | "user";
+    userId?: number;
+    page: number;
+    pageSize?: number;
+    status: string;
+    query: string;
+    sort: string;
+  }) => {
+    const params = new URLSearchParams({
+      scope: options.scope,
+      page: String(options.page),
+      pageSize: String(options.pageSize ?? 20),
+      status: options.status,
+      query: options.query,
+      sort: options.sort,
+    });
+    if (options.userId) params.set("userId", String(options.userId));
+    return authenticatedApiRequest<EventPage>(`/api/event/list?${params}`);
+  },
   update_content_list: async (id: number, contentList: string) =>
     authenticatedApiRequest<EventResponseDto>(`/api/event/content_list/${id}`, {
       method: "PATCH",

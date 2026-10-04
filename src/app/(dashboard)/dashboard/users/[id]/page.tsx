@@ -1,426 +1,122 @@
 "use client";
-
-import {
-  AlertCircle,
-  Calendar,
-  ChevronLeft,
-  Clock,
-  MessageSquare,
-  Shield,
-} from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import type { EventResponseDto } from "@/app/models/event/event";
+import { useEffect, useState } from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
 import { AdminOnly } from "@/components/AdminOnly";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ErrorMessage } from "@/components/ErrorMessage";
+import { EventListPage } from "@/components/EventListPage";
+import { ProfileCard } from "@/components/profile/ProfileCard";
+import styles from "@/components/profile/ProfileLayout.module.css";
 import { Button } from "@/components/ui/button";
-import { getAvatarUrl } from "@/lib/avatar";
-import { eventApi } from "@/lib/eventApi";
-import { getRoleLabel } from "@/lib/roles";
+import type { EventPage } from "@/lib/eventApi";
 import { userApi } from "@/lib/userApi";
-import { cn } from "@/lib/utils";
-
-const statusNames: Record<string, string> = {
-  Pending: "Ожидает",
-  Cancelled: "Отменено",
-  Approved: "Одобрено",
-  Completed: "Завершено",
-};
-
-const statusColors: Record<string, string> = {
-  Pending: "bg-yellow-500",
-  Cancelled: "bg-red-500",
-  Approved: "bg-green-500",
-  Completed: "bg-blue-500",
-};
-
-function isNotFoundError(error: unknown): boolean {
-  const message = String(
-    (error as { message?: string })?.message ?? "",
-  ).toLowerCase();
-  const status = (error as { status?: number })?.status;
-
-  return (
-    message.includes("не найдено") ||
-    message.includes("не найден") ||
-    message.includes("нет событий") ||
-    message.includes("нет заявок") ||
-    status === 404 ||
-    message.includes("not found")
-  );
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
+import { getErrorMessage } from "@/lib/userFacingMessages";
 export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
   const userId = Number(params.id);
-
+  const [summary, setSummary] = useState<EventPage["summary"] | null>(null);
   const [user, setUser] = useState<UserResponseDto | null>(null);
-  const [events, setEvents] = useState<EventResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const userPromise = userApi.get_by_id(userId);
-      const eventsPromise = eventApi.get_by_user(userId).catch((loadError) => {
-        if (isNotFoundError(loadError)) {
-          return [];
-        }
-
-        throw loadError;
-      });
-
-      const [userData, eventsData] = await Promise.all([
-        userPromise,
-        eventsPromise,
-      ]);
-
-      setUser(userData);
-      setEvents(
-        [...eventsData].sort(
-          (left, right) =>
-            new Date(right.creationTime).getTime() -
-            new Date(left.creationTime).getTime(),
-        ),
-      );
-    } catch (loadError: unknown) {
-      console.error("Ошибка загрузки пользователя:", loadError);
-      setError(getErrorMessage(loadError, "Не удалось загрузить пользователя"));
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
   useEffect(() => {
-    if (Number.isInteger(userId) && userId > 0) {
-      void loadData();
-    } else {
-      setError("Некорректный идентификатор пользователя");
-      setLoading(false);
-    }
-  }, [userId, loadData]);
-
-  function formatDateTime(dateString: string) {
-    const date = new Date(dateString);
-    return date.toLocaleString("ru-RU", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  function getInitials(name: string) {
-    return name.substring(0, 1).toUpperCase();
-  }
-
-  if (loading) {
-    return (
-      <AdminOnly>
-        <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center py-12">
-              <div className="inline-flex items-center gap-2 text-muted-foreground">
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <p>Загрузка...</p>
-              </div>
-            </div>
-          </div>
-        </main>
-      </AdminOnly>
-    );
-  }
-
-  if (error || !user) {
-    return (
-      <AdminOnly>
-        <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-          <div className="max-w-6xl mx-auto">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="mb-6"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Назад
-            </Button>
-
-            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-destructive mb-1">
-                    {error || "Пользователь не найден"}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push("/dashboard/users")}
-                    className="mt-3"
-                  >
-                    Вернуться к списку
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-      </AdminOnly>
-    );
-  }
-
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setUser(null);
+    setSummary(null);
+    const load = async () => {
+      try {
+        if (!Number.isSafeInteger(userId) || userId < 1)
+          throw new Error("Некорректный идентификатор пользователя");
+        const data = await userApi.get_by_id(userId);
+        if (active) setUser(data);
+      } catch (err) {
+        if (active)
+          setError(getErrorMessage(err, "Не удалось загрузить пользователя"));
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [userId]);
   return (
     <AdminOnly>
-      <main className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="flex items-center gap-4 overflow-hidden">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              size="icon"
-              className="shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <div className="overflow-hidden">
-              <h1 className="text-2xl lg:text-3xl font-bold truncate">
-                {user.name}
-              </h1>
-            </div>
-          </div>
-
-          <div className="grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
-            <div className="space-y-6">
-              <div className="bg-card border border-border rounded-xl p-6">
-                <div className="flex justify-center mb-6">
-                  <div className="relative">
-                    {user.role === "Admin" && (
-                      <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
-                    )}
-                    <Avatar className="h-24 w-24 relative border-2 border-background">
-                      <AvatarImage
-                        src={getAvatarUrl(user.login, user.role)}
-                        alt={user.login}
-                      />
-                      <AvatarFallback
-                        className={cn(
-                          "text-2xl font-bold",
-                          user.role === "Admin" &&
-                            "bg-primary text-primary-foreground",
-                        )}
-                      >
-                        {getInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Ник
-                    </span>
-                    <span className="text-base font-semibold text-right break-words">
-                      {user.name}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Логин
-                    </span>
-                    <span className="text-base font-semibold text-right break-words">
-                      {user.login}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3 border-b border-border gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Роль
-                    </span>
-                    <span className="text-base font-semibold text-right">
-                      {getRoleLabel(user.role)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3 gap-4">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      Статус
-                    </span>
-                    <span
-                      className={cn(
-                        "text-base font-semibold text-right",
-                        user.banned && "text-red-600 dark:text-red-400",
-                      )}
-                    >
-                      {user.banned ? "Забанен" : "Активен"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                    <Shield className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Статистика</h2>
-                    <p className="text-sm text-muted-foreground">
-                      История заявок
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Всего заявок
-                    </p>
-                    <p className="text-2xl font-bold">{events.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Последняя активность
-                    </p>
-                    <p className="text-sm">
-                      {events[0] ? formatDateTime(events[0].creationTime) : "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-6 overflow-hidden">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Прошлые заявки</h2>
-                  <p className="text-sm text-muted-foreground">
-                    История заявок пользователя на мероприятия
-                  </p>
-                </div>
-              </div>
-
-              {events.length === 0 ? (
-                <div className="text-center py-12 bg-secondary/20 border border-border/50 rounded-xl">
-                  <div className="max-w-md mx-auto px-4">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Calendar className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      Заявок пока нет
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      У этого пользователя еще нет заявок на съемку
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {events.map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={() =>
-                        router.push(`/dashboard/events/${event.id}`)
-                      }
-                      className="w-full text-left bg-secondary/20 hover:bg-secondary/35 border border-border rounded-xl p-4 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4 mb-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <div
-                              className={cn(
-                                "w-2 h-2 rounded-full shrink-0",
-                                statusColors[event.status] ?? "bg-gray-500",
-                              )}
-                            />
-                            <span className="text-sm font-medium">
-                              {statusNames[event.status] ?? event.status}
-                            </span>
-                            <span className="text-xs text-muted-foreground font-mono">
-                              #{event.id}
-                            </span>
-                          </div>
-                          <p className="font-medium break-words">
-                            {event.reason}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Создано
-                            </p>
-                            <p className="text-sm font-medium">
-                              {formatDateTime(event.creationTime)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Период
-                            </p>
-                            <p>{formatDateTime(event.startTime)}</p>
-                            <p className="text-muted-foreground">
-                              {formatDateTime(event.endTime)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {(event.comment || event.adminComment) && (
-                        <div className="mt-3 pt-3 border-t border-border space-y-2">
-                          {event.comment && (
-                            <div className="text-xs bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MessageSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                <span className="text-blue-600 dark:text-blue-400 font-medium">
-                                  Комментарий пользователя
-                                </span>
-                              </div>
-                              <p className="break-words whitespace-pre-wrap">
-                                {event.comment}
-                              </p>
-                            </div>
-                          )}
-                          {event.adminComment && (
-                            <div className="text-xs bg-purple-500/10 border border-purple-500/20 rounded px-3 py-2">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MessageSquare className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                                <span className="text-purple-600 dark:text-purple-400 font-medium">
-                                  Комментарий администратора
-                                </span>
-                              </div>
-                              <p className="break-words whitespace-pre-wrap">
-                                {event.adminComment}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+      <main
+        className={`${styles.page} pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8`}
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+            aria-label="Назад"
+          >
+            <ChevronLeft size={18} />
+          </Button>
+          <h1 className="text-2xl font-semibold">Профиль пользователя</h1>
         </div>
+        {error && <ErrorMessage message={error} />}
+        {loading ? (
+          <output>Загрузка пользователя…</output>
+        ) : (
+          user && (
+            <div className={styles.grid}>
+              <div className={styles.panels}>
+                <ProfileCard user={user} showStatus />
+                <section className={styles.panel}>
+                  <h2 className="font-semibold mb-4">Данные представителя</h2>
+                  <dl className="space-y-4 text-sm">
+                    <div>
+                      <dt className="text-muted-foreground">Организация</dt>
+                      <dd className="break-words">
+                        {user.organization || "Не указана"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Контакты</dt>
+                      <dd className="break-words">
+                        {user.representativeContacts || "Не указаны"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+                {summary && (
+                  <section className={styles.panel}>
+                    <h2 className="font-semibold mb-4">Статистика заявок</h2>
+                    <dl className="space-y-3 text-sm">
+                      {(
+                        [
+                          ["total", "Всего"],
+                          ["Pending", "Ожидают"],
+                          ["Approved", "Одобрены"],
+                          ["Cancelled", "Отменены"],
+                          ["Completed", "Завершены"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <div key={key} className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd>{summary[key]}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                )}
+              </div>
+              <EventListPage
+                key={userId}
+                scope="user"
+                userId={userId}
+                title="Заявки пользователя"
+                onSummary={setSummary}
+              />
+            </div>
+          )
+        )}
       </main>
     </AdminOnly>
   );

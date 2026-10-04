@@ -17,6 +17,11 @@ model User {
   banned                 Boolean   @default(false)
   refreshToken           String?
   refreshTokenExpiryTime DateTime?
+  organization           String    @default("")
+  representativeContacts String    @default("")
+  avatarSeed             String?
+  avatarUrl              String?
+  sessions               UserSession[]
   events                 Event[]
 
   @@map("Users")
@@ -34,10 +39,31 @@ model Event {
   warningsJson String
   comment      String?
   adminComment String?
+  searchText   String?
   detailsJson  String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
   @@map("Events")
+}
+
+model UserSession {
+  id               String   @id @default(uuid())
+  userId           Int
+  refreshTokenHash String   @unique
+  createdAt        DateTime @default(now())
+  lastUsedAt       DateTime @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  userAgent        String?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model AuthRateLimit {
+  key String @id
+  count Int
+  resetsAt DateTime
 }

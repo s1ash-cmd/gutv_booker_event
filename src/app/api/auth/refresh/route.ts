@@ -1,37 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import type { RefreshRequest } from "@/app/models/auth/auth";
-import { authService } from "@/lib/auth";
-import { UserService } from "@/services/userService";
-
-const userService = new UserService();
-
+import { refreshSchema } from "@/lib/profileValidation";
+import { readJson } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
+import { refreshSession } from "@/services/sessionService";
 export async function POST(request: NextRequest) {
   try {
-    const body: RefreshRequest = await request.json();
-
-    const user = await userService.getByRefreshToken(body.refreshToken);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Недействительный refresh токен" },
-        { status: 401 },
-      );
-    }
-
-    const newAccessToken = await authService.generateAccessToken(user);
-    const newRefreshToken = authService.generateRefreshToken();
-
-    await userService.saveRefreshToken(user.id, newRefreshToken);
-
-    return NextResponse.json({
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    });
+    const body = refreshSchema.parse(await readJson(request));
+    return NextResponse.json(await refreshSession(body.refreshToken));
   } catch (error) {
-    console.error("Refresh error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return routeError(error);
   }
 }

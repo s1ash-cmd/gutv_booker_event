@@ -161,9 +161,17 @@ export function AppSidebar() {
               {isAdmin && (
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-full blur opacity-75"></div>
               )}
-              <Avatar className="h-10 w-10 relative border-2 border-background">
+              <Avatar
+                userRole={user.role}
+                className="h-10 w-10 relative border-2 border-background"
+              >
                 <AvatarImage
-                  src={getAvatarUrl(user.login, user.role)}
+                  src={getAvatarUrl(
+                    user.login,
+                    user.role,
+                    user.avatarSeed,
+                    user.avatarUrl,
+                  )}
                   alt={user.login}
                 />
                 <AvatarFallback

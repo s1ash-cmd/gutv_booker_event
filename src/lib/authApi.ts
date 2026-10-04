@@ -1,118 +1,89 @@
 import { ApiError, apiRequest } from "./api";
 
-let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
-
-type AuthTokens = {
-  accessToken: string;
-  refreshToken: string;
-};
-
+type AuthTokens = { accessToken: string; refreshToken: string };
+let refreshPromise: Promise<string> | null = null;
 function persistTokens(tokens: AuthTokens) {
   localStorage.setItem("access_token", tokens.accessToken);
   localStorage.setItem("refresh_token", tokens.refreshToken);
 }
-
-function subscribeTokenRefresh(callback: (token: string) => void) {
-  refreshSubscribers.push(callback);
+function clearTokens() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
-
-function onTokenRefreshed(token: string) {
-  refreshSubscribers.forEach((callback) => {
-    callback(token);
-  });
-  refreshSubscribers = [];
-}
-
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = localStorage.getItem("refresh_token");
-
-  if (!refreshToken) {
-    throw new Error("No refresh token");
-  }
-
-  try {
-    const data = await apiRequest<AuthTokens>("/api/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken }),
+async function performRefresh(): Promise<string> {
+  const run = async () => {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) throw new Error("Войдите в аккаунт");
+    try {
+      const data = await apiRequest<AuthTokens>("/api/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
+      // A logout or another login must not be overwritten by an older response.
+      if (localStorage.getItem("refresh_token") !== refreshToken)
+        throw new Error("Сессия изменилась");
+      persistTokens(data);
+      return data.accessToken;
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.status === 401 &&
+        localStorage.getItem("refresh_token") === refreshToken
+      )
+        clearTokens();
+      throw error;
+    }
+  };
+  const previousAccess = localStorage.getItem("access_token");
+  if (typeof navigator !== "undefined" && navigator.locks)
+    return navigator.locks.request("gutv-event-refresh", async () => {
+      const currentAccess = localStorage.getItem("access_token");
+      if (currentAccess && currentAccess !== previousAccess)
+        return currentAccess;
+      return run();
     });
-
-    persistTokens(data);
-    return data.accessToken;
-  } catch (error) {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    throw error;
-  }
+  return run();
 }
-
-export async function authenticatedApiRequest<TData>(
+function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise)
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
+}
+export async function authenticatedApiRequest<T>(
   path: string,
   options?: RequestInit,
-): Promise<TData> {
+): Promise<T> {
   const token = localStorage.getItem("access_token") ?? "";
-
   try {
-    return await apiRequest<TData>(path, {
-      ...options,
-      token,
-    });
+    return await apiRequest<T>(path, { ...options, token });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-
-        try {
-          const newToken = await refreshAccessToken();
-          isRefreshing = false;
-          onTokenRefreshed(newToken);
-          return await apiRequest<TData>(path, {
-            ...options,
-            token: newToken,
-          });
-        } catch (refreshError) {
-          isRefreshing = false;
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-          throw refreshError;
-        }
-      }
-
-      return new Promise((resolve, reject) => {
-        subscribeTokenRefresh(async (newToken: string) => {
-          try {
-            const result = await apiRequest<TData>(path, {
-              ...options,
-              token: newToken,
-            });
-            resolve(result);
-          } catch (requestError) {
-            reject(requestError);
-          }
-        });
-      });
-    }
-
-    throw error;
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    const newerToken = localStorage.getItem("access_token");
+    const refreshed =
+      newerToken && newerToken !== token
+        ? newerToken
+        : await refreshAccessToken();
+    return apiRequest<T>(path, { ...options, token: refreshed });
   }
 }
-
 export const authApi = {
   login: async (login: string, password: string) => {
     const data = await apiRequest<AuthTokens>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ login, password }),
     });
-
     persistTokens(data);
     return data;
   },
-
-  logout: () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+  logout: async () => {
+    await authenticatedApiRequest("/api/auth/logout", { method: "POST" });
+    clearTokens();
   },
-
+  logoutAll: async () => {
+    await authenticatedApiRequest("/api/auth/logout_all", { method: "POST" });
+    clearTokens();
+  },
   refreshToken: refreshAccessToken,
 };

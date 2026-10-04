@@ -25,6 +25,10 @@ export function RegisterForm() {
 
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
+    for (const field of ["organization", "representativeContacts"]) {
+      if (!String(formData.get(field) ?? "").trim())
+        newErrors[field] = "Заполните это поле";
+    }
     const login = formData.get("login") as string;
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
@@ -83,7 +87,10 @@ export function RegisterForm() {
     try {
       const firstName = formData.get("firstName") as string;
       const lastName = formData.get("lastName") as string;
-      const name = `${firstName.trim()} ${lastName.trim()}`;
+      const patronymic = String(formData.get("patronymic") ?? "").trim();
+      const name = [lastName.trim(), firstName.trim(), patronymic]
+        .filter(Boolean)
+        .join(" ");
       const login = formData.get("login") as string;
       const password = formData.get("password") as string;
 
@@ -91,6 +98,10 @@ export function RegisterForm() {
         login,
         password,
         name,
+        organization: String(formData.get("organization") ?? "").trim(),
+        representativeContacts: String(
+          formData.get("representativeContacts") ?? "",
+        ).trim(),
       });
 
       router.push("/login");
@@ -152,6 +163,7 @@ export function RegisterForm() {
                 <Input
                   id="firstName"
                   name="firstName"
+                  maxLength={60}
                   type="text"
                   placeholder="Иван"
                   autoComplete="given-name"
@@ -181,6 +193,7 @@ export function RegisterForm() {
                 <Input
                   id="lastName"
                   name="lastName"
+                  maxLength={60}
                   type="text"
                   placeholder="Иванов"
                   autoComplete="family-name"
@@ -205,12 +218,66 @@ export function RegisterForm() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="patronymic">Отчество (при наличии)</Label>
+              <Input
+                id="patronymic"
+                name="patronymic"
+                maxLength={60}
+                disabled={isLoading}
+                autoComplete="additional-name"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Данные представителя указываются один раз и автоматически
+              используются в заявках. Изменить их можно в профиле.
+            </p>
+            {(
+              [
+                [
+                  "organization",
+                  "Организация",
+                  "Студенческий совет факультета",
+                  300,
+                ],
+                [
+                  "representativeContacts",
+                  "Контакты представителя",
+                  "Телефон или электронная почта",
+                  1000,
+                ],
+              ] as const
+            ).map(([field, label, placeholder, max]) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={field}>
+                  {label} <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={field}
+                  name={field}
+                  placeholder={placeholder}
+                  required
+                  minLength={2}
+                  maxLength={max}
+                  disabled={isLoading}
+                  aria-invalid={Boolean(errors[field])}
+                  onChange={() => clearError(field)}
+                />
+                {errors[field] && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors[field]}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            <div className="space-y-2">
               <Label htmlFor="login" className="md:text-lg lg:text-lg">
                 Логин <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="login"
                 name="login"
+                maxLength={100}
                 type="text"
                 placeholder="Ваш логин"
                 autoComplete="username"
@@ -241,6 +308,7 @@ export function RegisterForm() {
                 <Input
                   id="password"
                   name="password"
+                  maxLength={256}
                   type={showPassword ? "text" : "password"}
                   placeholder="Не менее 8 символов"
                   autoComplete="new-password"

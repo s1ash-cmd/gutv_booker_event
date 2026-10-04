@@ -12,6 +12,29 @@ export const userApi = {
       body: JSON.stringify(input),
     }),
 
+  update_profile: async (input: {
+    name: string;
+    organization: string;
+    representativeContacts: string;
+  }) =>
+    authenticatedApiRequest<UserResponseDto>("/api/users/profile", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  upload_avatar: async (photo: Blob) =>
+    authenticatedApiRequest<UserResponseDto>("/api/users/avatar", {
+      method: "POST",
+      body: photo,
+      headers: { "Content-Type": photo.type },
+    }),
+  remove_avatar: async () =>
+    authenticatedApiRequest<UserResponseDto>("/api/users/avatar", {
+      method: "DELETE",
+    }),
+  regenerate_avatar: async () =>
+    authenticatedApiRequest<UserResponseDto>("/api/users/avatar", {
+      method: "PATCH",
+    }),
   get_all: async () =>
     authenticatedApiRequest<UserResponseDto[]>("/api/users/get_all"),
 

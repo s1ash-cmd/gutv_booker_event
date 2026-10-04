@@ -5,22 +5,23 @@ import {
   UserRole,
 } from "@/app/models/user/user";
 import type { User } from "@/generated/prisma/client";
+import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
 export class UserService {
   private async createDtoToUser(request: CreateUserRequestDto) {
     const salt = crypto.randomBytes(16).toString("base64");
-    const passwordHash = crypto
-      .createHash("sha256")
-      .update(request.password + salt)
-      .digest("base64");
+    const passwordHash = await hashPassword(request.password, salt);
     const normalizedLogin = request.login.trim().toLowerCase();
 
     return {
       login: normalizedLogin,
       passwordHash,
       salt,
-      name: request.name,
+      name: request.name.trim(),
+      organization: request.organization.trim(),
+      representativeContacts: request.representativeContacts.trim(),
+      avatarSeed: crypto.randomUUID(),
       role: UserRole.Organization,
       banned: false,
     };
@@ -30,31 +31,14 @@ export class UserService {
     return {
       id: user.id,
       name: user.name,
+      organization: user.organization,
+      representativeContacts: user.representativeContacts,
+      avatarSeed: user.avatarSeed,
+      avatarUrl: user.avatarUrl,
       login: user.login,
       role: UserRole[user.role],
       banned: user.banned,
     };
-  }
-
-  async saveRefreshToken(userId: number, refreshToken: string) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        refreshToken,
-        refreshTokenExpiryTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
-    });
-  }
-
-  async getByRefreshToken(refreshToken: string): Promise<User | null> {
-    return await prisma.user.findFirst({
-      where: {
-        refreshToken,
-        refreshTokenExpiryTime: {
-          gt: new Date(),
-        },
-      },
-    });
   }
 
   async getByLogin(login: string): Promise<User | null> {
@@ -125,10 +109,13 @@ export class UserService {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return false;
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { banned: true },
-    });
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { banned: true } }),
+      prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
     return true;
   }
 

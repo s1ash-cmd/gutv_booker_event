@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ import {
   validateEventDetails,
 } from "@/lib/eventRequirements";
 import { canCreateEvent } from "@/lib/roles";
+import { userApi } from "@/lib/userApi";
 
 const eventStatusLabels: Record<string, string> = {
   Pending: "На рассмотрении",
@@ -48,6 +49,46 @@ export function EventRequestPage() {
     contentIdea: "",
     contentList: "",
   });
+  const [profileReady, setProfileReady] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setProfileReady(false);
+    if (!isAuth || !user?.id) return;
+    const load = async () => {
+      try {
+        const profile = await userApi.get_me();
+        if (!active) return;
+        setFields((previous) => ({
+          ...previous,
+          organization: profile.organization,
+          representativeName: profile.name,
+          representativeContacts: profile.representativeContacts,
+        }));
+        setProfileReady(
+          Boolean(
+            profile.organization.trim() &&
+              profile.name.trim() &&
+              profile.representativeContacts.trim(),
+          ),
+        );
+        setProfileError(null);
+      } catch {
+        if (active) {
+          setProfileReady(false);
+          setProfileError(
+            "Не удалось загрузить данные представителя. Обновите страницу.",
+          );
+        }
+      }
+    };
+    void load();
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+    };
+  }, [isAuth, user?.id]);
   const nextSessionId = useRef(1);
   const [sessions, setSessions] = useState([
     { id: 0, startTime: "", endTime: "", location: "" },
@@ -129,6 +170,10 @@ export function EventRequestPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!profileReady) {
+      setError("Заполните данные представителя в профиле");
+      return;
+    }
     setError(null);
     setSuccessMessage(null);
     const normalizedSessions = sessions.map(
@@ -191,9 +236,9 @@ export function EventRequestPage() {
       setCreatedEventId(event.id);
       setReason("");
       setFields({
-        organization: "",
-        representativeName: "",
-        representativeContacts: "",
+        organization: fields.organization,
+        representativeName: fields.representativeName,
+        representativeContacts: fields.representativeContacts,
         scenario: "",
         participants: "",
         deliveryDeadline: "",
@@ -398,21 +443,30 @@ export function EventRequestPage() {
 
               <div className="space-y-5 border-t border-border pt-5">
                 <h3 className="font-semibold">Организация и представитель</h3>
-                {textField(
-                  "organization",
-                  "Название организации",
-                  "Например, студенческий совет факультета",
-                )}
-                {textField(
-                  "representativeName",
-                  "ФИО представителя",
-                  "Фамилия, имя и отчество",
-                )}
-                {textField(
-                  "representativeContacts",
-                  "Контакты представителя",
-                  "Телефон, Telegram или электронная почта",
-                )}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2 text-sm">
+                  {profileReady ? (
+                    <>
+                      <p className="font-medium">{fields.organization}</p>
+                      <p>{fields.representativeName}</p>
+                      <p className="text-muted-foreground break-words">
+                        {fields.representativeContacts}
+                      </p>
+                    </>
+                  ) : (
+                    <p role="alert">
+                      {profileError ??
+                        "Заполните данные представителя в профиле перед подачей заявки."}
+                    </p>
+                  )}
+                  <Link
+                    href="/dashboard/profile"
+                    className="inline-block text-primary hover:underline"
+                  >
+                    {profileReady
+                      ? "Изменить данные в профиле"
+                      : "Открыть профиль"}
+                  </Link>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="reason">
                     Обоснование заявки{" "}
@@ -744,7 +798,7 @@ export function EventRequestPage() {
                   type="submit"
                   size="lg"
                   className="w-full sm:w-auto"
-                  disabled={loading}
+                  disabled={loading || !profileReady}
                 >
                   <CalendarPlus className="w-4 h-4 mr-2" />
                   {loading ? "Отправка..." : "Отправить заявку"}

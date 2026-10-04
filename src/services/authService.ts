@@ -16,11 +16,13 @@ export class AuthService {
     this.secret = new TextEncoder().encode(settings.key);
   }
 
-  async generateAccessToken(user: User): Promise<string> {
+  async generateAccessToken(user: User, sessionId: string): Promise<string> {
     const roleName = UserRole[user.role as number];
 
     const token = await new SignJWT({
       sub: user.id.toString(),
+      sid: sessionId,
+      avatarSeed: user.avatarSeed,
       name: user.name,
       login: user.login,
       role: roleName,
@@ -44,6 +46,7 @@ export class AuthService {
   async verifyToken(token: string): Promise<JWTPayload> {
     try {
       const { payload } = await jwtVerify(token, this.secret, {
+        algorithms: ["HS256"],
         issuer: this.settings.issuer,
         audience: this.settings.audience,
       });

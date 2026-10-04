@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/authUtils";
+import { InputError } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
 import { UserService } from "@/services/userService";
 
 const userService = new UserService();
@@ -19,6 +21,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(foundUser);
   } catch (error) {
+    if (
+      error instanceof SyntaxError ||
+      error instanceof InputError ||
+      (error instanceof Error && error.name.startsWith("Prisma"))
+    )
+      return routeError(error);
     if (error instanceof Error) {
       if (
         error.message === "Unauthorized" ||

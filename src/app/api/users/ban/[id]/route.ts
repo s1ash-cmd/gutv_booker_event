@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@/app/models/user/user";
 import { getUserFromToken, requireRole } from "@/lib/authUtils";
+import { InputError, routeId } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
 import { UserService } from "@/services/userService";
 
 const userService = new UserService();
@@ -14,7 +16,7 @@ export async function PATCH(
     requireRole(user.role, UserRole.Admin);
 
     const { id: idParam } = await params;
-    const id = parseInt(idParam, 10);
+    const id = routeId(idParam);
 
     if (id <= 0 || id === user.id) {
       return NextResponse.json(
@@ -36,6 +38,12 @@ export async function PATCH(
       message: `Пользователь с ID ${id} заблокирован`,
     });
   } catch (error) {
+    if (
+      error instanceof SyntaxError ||
+      error instanceof InputError ||
+      (error instanceof Error && error.name.startsWith("Prisma"))
+    )
+      return routeError(error);
     if (error instanceof Error) {
       if (
         error.message === "Unauthorized" ||

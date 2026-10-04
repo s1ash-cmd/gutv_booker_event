@@ -10,9 +10,21 @@ function getRequiredEnv(name: string) {
   return value;
 }
 
+const expireMinutes = Number(getRequiredEnv("JWT_EXPIRE_MINUTES"));
+if (
+  !Number.isInteger(expireMinutes) ||
+  expireMinutes < 1 ||
+  expireMinutes > 1440
+) {
+  throw new Error("JWT_EXPIRE_MINUTES must be an integer from 1 to 1440");
+}
+const key = getRequiredEnv("JWT_SECRET");
+if (process.env.NODE_ENV === "production" && Buffer.byteLength(key) < 32) {
+  throw new Error("JWT_SECRET must contain at least 32 bytes in production");
+}
 export const authService = new AuthService({
-  key: getRequiredEnv("JWT_SECRET"),
+  key,
   issuer: getRequiredEnv("JWT_ISSUER"),
   audience: getRequiredEnv("JWT_AUDIENCE"),
-  expireMinutes: Number.parseInt(getRequiredEnv("JWT_EXPIRE_MINUTES"), 10),
+  expireMinutes,
 });

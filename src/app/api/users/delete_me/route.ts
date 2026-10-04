@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/authUtils";
+import { InputError } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
 import { UserService } from "@/services/userService";
 
 const userService = new UserService();
@@ -20,6 +22,12 @@ export async function DELETE(request: NextRequest) {
       message: `Пользователь с ID ${user.id} успешно удалён`,
     });
   } catch (error) {
+    if (
+      error instanceof SyntaxError ||
+      error instanceof InputError ||
+      (error instanceof Error && error.name.startsWith("Prisma"))
+    )
+      return routeError(error);
     if (error instanceof Error) {
       if (
         error.message === "Unauthorized" ||

@@ -5,107 +5,74 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import { authApi } from "@/lib/authApi";
+import { userApi } from "@/lib/userApi";
 
 interface User {
   id: string;
   login: string;
   name: string;
   role: string;
+  organization?: string;
+  representativeContacts?: string;
+  avatarSeed?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuth: boolean;
   isLoading: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
   setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function decodeJWT(token: string) {
-  const base64Url = token.split(".")[1];
-  let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-
-  while (base64.length % 4 !== 0) {
-    base64 += "=";
-  }
-
-  const jsonPayload = decodeURIComponent(
-    atob(base64)
-      .split("")
-      .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-      .join(""),
-  );
-
-  return JSON.parse(jsonPayload);
-}
-
-function mapJwtToUser(payload: Record<string, unknown>): User {
-  const role =
-    (payload.role as string | undefined) ??
-    (payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] as
-      | string
-      | undefined) ??
-    "User";
-
-  const login =
-    (payload.unique_name as string | undefined) ??
-    (payload.login as string | undefined) ??
-    "";
-
-  const name =
-    (payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as
-      | string
-      | undefined) ??
-    (payload.name as string | undefined) ??
-    login;
-
-  return {
-    id: String(payload.sub ?? ""),
-    login,
-    name,
-    role,
-  };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const generation = useRef(0);
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const refreshToken = localStorage.getItem("refresh_token");
-
-    if (token) {
+    let active = true;
+    const load = async () => {
+      const version = ++generation.current;
+      const current = () => active && generation.current === version;
       try {
-        const payload = decodeJWT(token);
-
-        const isExpired = payload.exp * 1000 < Date.now();
-
-        if (!isExpired || refreshToken) {
-          setUser(mapJwtToUser(payload));
-        } else {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
+        if (!localStorage.getItem("access_token")) {
+          if (current()) setUser(null);
+          return;
         }
-      } catch (error) {
-        console.error("Ошибка декодирования токена:", error);
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        const data = await userApi.get_me();
+        if (current()) setUser({ ...data, id: String(data.id) });
+      } catch {
+        if (current()) setUser(null);
+      } finally {
+        if (current()) setIsLoading(false);
       }
-    }
-
-    setIsLoading(false);
+    };
+    void load();
+    window.addEventListener("focus", load);
+    window.addEventListener("storage", load);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+      window.removeEventListener("storage", load);
+    };
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    setUser(null);
-    window.location.replace("/");
+  const logout = async () => {
+    try {
+      await authApi.logout();
+      setUser(null);
+      window.location.replace("/");
+    } catch {
+      window.alert("Не удалось завершить сессию. Повторите выход.");
+    }
   };
 
   return (

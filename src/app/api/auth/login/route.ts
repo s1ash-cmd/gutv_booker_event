@@ -1,57 +1,41 @@
-import crypto from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
-import type { LoginRequest } from "@/app/models/auth/auth";
-import { authService } from "@/lib/auth";
+import { hashPassword, verifyPassword } from "@/lib/password";
+import { prisma } from "@/lib/prisma";
+import { loginSchema } from "@/lib/profileValidation";
+import { authRateLimit } from "@/lib/rateLimit";
+import { readJson } from "@/lib/requestValidation";
+import { routeError } from "@/lib/routeError";
+import { createSession } from "@/services/sessionService";
 import { UserService } from "@/services/userService";
-
-const userService = new UserService();
-
 export async function POST(request: NextRequest) {
   try {
-    const body: LoginRequest = await request.json();
-
-    const user = await userService.getByLogin(body.login);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Неверный логин или пароль" },
-        { status: 401 },
-      );
-    }
-
-    const passwordHash = crypto
-      .createHash("sha256")
-      .update(body.password + user.salt)
-      .digest("base64");
-
-    if (passwordHash !== user.passwordHash) {
-      return NextResponse.json(
-        { error: "Неверный логин или пароль" },
-        { status: 401 },
-      );
-    }
-
-    if (user.banned) {
-      return NextResponse.json(
-        { error: "Пользователь заблокирован" },
-        { status: 401 },
-      );
-    }
-
-    const accessToken = await authService.generateAccessToken(user);
-    const refreshToken = authService.generateRefreshToken();
-
-    await userService.saveRefreshToken(user.id, refreshToken);
-
-    return NextResponse.json({
-      accessToken,
-      refreshToken,
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
+    const body = loginSchema.parse(await readJson(request));
+    const limited = await authRateLimit(
+      `login:${body.login.toLowerCase()}`,
+      15,
     );
+    if (limited) return limited;
+    const globalLimit = await authRateLimit("login-global", 300);
+    if (globalLimit) return globalLimit;
+    const user = await new UserService().getByLogin(body.login);
+    let valid = false;
+    if (user)
+      valid = await verifyPassword(body.password, user.salt, user.passwordHash);
+    else await hashPassword(body.password, "dummy-auth-salt");
+    if (!user || !valid || user.banned)
+      return NextResponse.json(
+        { error: "Неверный логин или пароль" },
+        { status: 401 },
+      );
+    if (!user.passwordHash.startsWith("scrypt:"))
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: await hashPassword(body.password, user.salt) },
+      });
+    return NextResponse.json(
+      await createSession(user, request.headers.get("user-agent")),
+    );
+  } catch (error) {
+    return routeError(error);
   }
 }
