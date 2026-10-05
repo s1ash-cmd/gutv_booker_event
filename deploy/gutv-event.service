@@ -1,0 +1,38 @@
+[Unit]
+Description=GUtv Event application
+After=network.target
+
+[Service]
+Type=simple
+User=gutv-event
+Group=gutv-event
+WorkingDirectory=/opt/gutv/event/current
+EnvironmentFile=/etc/gutv-event.env
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3010
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/bin/node /opt/gutv/event/current/server.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=gutv-event
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryMax=768M
+TasksMax=128
+CPUQuota=75%
+
+[Install]
+WantedBy=multi-user.target

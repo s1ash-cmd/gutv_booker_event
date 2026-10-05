@@ -1,0 +1,52 @@
+name: Event CI and deploy
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      DATABASE_URL: 'file:/tmp/event-build.sqlite3'
+      JWT_SECRET: 'build-only-placeholder-not-a-production-secret-00000000'
+      JWT_ISSUER: 'event-build'
+      JWT_AUDIENCE: 'event-build'
+      JWT_EXPIRE_MINUTES: '15'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+      - run: bash -n deploy/install.sh
+  deploy:
+    needs: check
+    if: github.repository == 's1ash-cmd/gutv_booker_event' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, linux, x64, gutv-event]
+    timeout-minutes: 25
+    concurrency:
+      group: production-event
+      cancel-in-progress: false
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      DATABASE_URL: 'file:/tmp/event-build.sqlite3'
+      JWT_SECRET: 'build-only-placeholder-not-a-production-secret-00000000'
+      JWT_ISSUER: 'event-build'
+      JWT_AUDIENCE: 'event-build'
+      JWT_EXPIRE_MINUTES: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: npm ci --no-fund --no-audit
+      - run: npm run build
+      - name: Deploy application and migrate persistent database
+        run: sudo -n /usr/local/sbin/gutv-event-deploy "$GITHUB_WORKSPACE"
