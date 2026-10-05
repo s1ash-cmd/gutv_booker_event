@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertCircle,
   ArrowDown,
   ArrowUp,
   Ban,
@@ -12,8 +11,15 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
+import { ErrorMessage } from "@/components/ErrorMessage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,24 +40,30 @@ import {
 import { userApi } from "@/lib/userApi";
 import { cn } from "@/lib/utils";
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function isNotFoundError(error: unknown): boolean {
-  const message = getErrorMessage(error, "");
-  const status = (error as { status?: number })?.status;
-
-  return (
-    message.includes("не найдено") ||
-    message.includes("не найден") ||
-    status === 404 ||
-    message.toLowerCase().includes("not found")
+  const typedError = error as { message?: string; status?: number };
+  return Boolean(
+    typedError.message?.includes("не найдено") ||
+      typedError.message?.includes("не найден") ||
+      typedError.status === 404 ||
+      typedError.message?.toLowerCase().includes("not found"),
   );
 }
 
+function sortUsersByName(
+  users: UserResponseDto[],
+  sortOrder: "nameAsc" | "nameDesc",
+) {
+  return [...users].sort((left, right) => {
+    const result = left.name.localeCompare(right.name, "ru", {
+      sensitivity: "base",
+    });
+
+    return sortOrder === "nameAsc" ? result : -result;
+  });
+}
+
 export default function UsersPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<UserResponseDto[]>([]);
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +72,7 @@ export default function UsersPage() {
   const [selectedBanStatus, setSelectedBanStatus] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<"nameAsc" | "nameDesc">("nameAsc");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const router = useRouter();
 
   const loadCurrentUser = useCallback(async () => {
     try {
@@ -89,38 +102,15 @@ export default function UsersPage() {
       setUsers(data);
     } catch (err: unknown) {
       console.error("Ошибка загрузки пользователей:", err);
+      const message = (err as { message?: string })?.message;
       setError(
-        getErrorMessage(
-          err,
-          "Не удалось загрузить пользователей. Попробуйте позже.",
-        ),
+        message || "Не удалось загрузить пользователей. Попробуйте позже.",
       );
       setUsers([]);
     } finally {
       setLoading(false);
     }
   }, []);
-
-  const filteredUsers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return users
-      .filter((user) => {
-        const matchesStatus =
-          selectedBanStatus === "all" ||
-          (selectedBanStatus === "banned" ? user.banned : !user.banned);
-        return (
-          matchesStatus &&
-          (user.name.toLowerCase().includes(query) ||
-            user.login.toLowerCase().includes(query))
-        );
-      })
-      .sort((left, right) => {
-        const result = left.name.localeCompare(right.name, "ru", {
-          sensitivity: "base",
-        });
-        return sortOrder === "nameAsc" ? result : -result;
-      });
-  }, [users, searchQuery, selectedBanStatus, sortOrder]);
 
   useEffect(() => {
     void loadCurrentUser();
@@ -138,16 +128,16 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err: unknown) {
       console.error("Ошибка при изменении статуса бана:", err);
-      setError(getErrorMessage(err, "Не удалось изменить статус пользователя"));
+      setError(
+        (err as { message?: string })?.message ||
+          "Не удалось изменить статус пользователя",
+      );
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleRoleChange(
-    id: number,
-    newRole: "admin" | "organization",
-  ) {
+  async function handleRoleChange(id: number, newRole: "admin" | "user") {
     try {
       setActionLoading(id);
       if (newRole === "admin") {
@@ -158,7 +148,10 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err: unknown) {
       console.error("Ошибка при изменении роли:", err);
-      setError(getErrorMessage(err, "Не удалось изменить роль пользователя"));
+      setError(
+        (err as { message?: string })?.message ||
+          "Не удалось изменить роль пользователя",
+      );
     } finally {
       setActionLoading(null);
     }
@@ -178,28 +171,37 @@ export default function UsersPage() {
     router.push(`/dashboard/users/${userId}`);
   }
 
-  function stopRowNavigation(event: React.MouseEvent<HTMLElement>) {
-    event.stopPropagation();
+  function handleRowNavigation(event: MouseEvent<HTMLElement>, userId: number) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, [role='checkbox']")) {
+      return;
+    }
+
+    openUser(userId);
   }
 
-  function handleBanClick(
-    event: React.MouseEvent<HTMLButtonElement>,
-    userId: number,
-    currentBanStatus: boolean,
-  ) {
-    event.stopPropagation();
-    void handleBan(userId, currentBanStatus);
+  function toggleNameSort() {
+    setSortOrder((current) => (current === "nameAsc" ? "nameDesc" : "nameAsc"));
   }
 
-  function handleRoleButtonClick(
-    event: React.MouseEvent<HTMLButtonElement>,
-    userId: number,
-    newRole: "admin" | "organization",
-  ) {
-    event.stopPropagation();
-    void handleRoleChange(userId, newRole);
-  }
+  const visibleUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const filtered = users.filter((user) => {
+      const matchesBanStatus =
+        selectedBanStatus === "all" ||
+        (selectedBanStatus === "banned" ? user.banned : !user.banned);
+      const matchesQuery =
+        !query ||
+        user.name.toLowerCase().includes(query) ||
+        user.login.toLowerCase().includes(query) ||
+        user.organization.toLowerCase().includes(query) ||
+        user.representativeContacts.toLowerCase().includes(query);
 
+      return matchesBanStatus && matchesQuery;
+    });
+
+    return sortUsersByName(filtered, sortOrder);
+  }, [searchQuery, selectedBanStatus, sortOrder, users]);
   const hasActiveFilters = searchQuery || selectedBanStatus !== "all";
 
   return (
@@ -214,8 +216,8 @@ export default function UsersPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Поиск по имени или логину..."
-                aria-label="Поиск по имени или логину"
+                aria-label="Поиск пользователей"
+                placeholder="Поиск по имени, логину, организации, контактам..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -236,26 +238,10 @@ export default function UsersPage() {
               <SelectContent>
                 <SelectItem value="all">Все</SelectItem>
                 <SelectItem value="active">Активные</SelectItem>
-                <SelectItem value="banned">Заблокированные</SelectItem>
+                <SelectItem value="banned">Забаненные</SelectItem>
               </SelectContent>
             </Select>
 
-            <Button
-              variant="outline"
-              onClick={() =>
-                setSortOrder((value) =>
-                  value === "nameAsc" ? "nameDesc" : "nameAsc",
-                )
-              }
-              aria-label="Изменить порядок сортировки имён"
-            >
-              {sortOrder === "nameAsc" ? (
-                <ArrowUp className="h-4 w-4" />
-              ) : (
-                <ArrowDown className="h-4 w-4" />
-              )}
-              По имени
-            </Button>
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -279,9 +265,7 @@ export default function UsersPage() {
               )}
               {selectedBanStatus !== "all" && (
                 <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded">
-                  {selectedBanStatus === "banned"
-                    ? "Заблокированные"
-                    : "Активные"}
+                  {selectedBanStatus === "banned" ? "Забаненные" : "Активные"}
                 </span>
               )}
             </div>
@@ -289,30 +273,13 @@ export default function UsersPage() {
         </div>
 
         {error && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center shrink-0 mt-0.5">
-                <AlertCircle className="w-3 h-3 text-destructive" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-destructive mb-1">
-                  Произошла ошибка
-                </p>
-                <p className="text-sm text-destructive/80">{error}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setError(null);
-                    loadUsers();
-                  }}
-                  className="mt-3"
-                >
-                  Попробовать снова
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ErrorMessage
+            message={error}
+            onRetry={() => {
+              setError(null);
+              void loadUsers();
+            }}
+          />
         )}
 
         {loading ? (
@@ -322,7 +289,7 @@ export default function UsersPage() {
               <p>Загрузка...</p>
             </div>
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : visibleUsers.length === 0 ? (
           <div className="text-center py-12 bg-card/30 border border-border/50 rounded-xl">
             <div className="max-w-md mx-auto px-4">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -348,80 +315,98 @@ export default function UsersPage() {
         ) : (
           <>
             <div className="lg:hidden space-y-4">
-              {filteredUsers.map((user) => {
+              {visibleUsers.map((user) => {
                 const isSelf = isCurrentUser(user.id);
                 const isAdmin = user.role === "Admin";
 
                 return (
+                  // biome-ignore lint/a11y/useSemanticElements: The card contains nested controls, so it cannot be an anchor.
                   <div
                     key={user.id}
-                    className="bg-card border border-border rounded-xl p-4"
+                    className="bg-card border border-border rounded-xl p-4 cursor-pointer"
+                    onClick={(event) => handleRowNavigation(event, user.id)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.target === event.currentTarget &&
+                        (event.key === "Enter" || event.key === " ")
+                      ) {
+                        event.preventDefault();
+                        openUser(user.id);
+                      }
+                    }}
+                    role="link"
+                    tabIndex={0}
                   >
-                    <button
-                      type="button"
-                      className="block w-full cursor-pointer text-left"
-                      onClick={() => openUser(user.id)}
-                    >
-                      {user.banned && (
-                        <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
-                            <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                              Заблокирован
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-2">
+                    {user.banned && (
+                      <div className="mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <UserIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p
-                                className={cn(
-                                  "font-medium text-sm truncate",
-                                  isAdmin
-                                    ? "text-blue-600 dark:text-blue-400"
-                                    : "",
-                                )}
-                              >
-                                {user.name}
-                              </p>
-                              {isSelf && (
-                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                                  Вы
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              @{user.login}
-                            </p>
-                          </div>
+                          <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                            Забанен
+                          </p>
                         </div>
                       </div>
-                    </button>
+                    )}
 
                     <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <UserIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p
+                              className={cn(
+                                "font-medium text-sm truncate",
+                                isAdmin
+                                  ? "text-blue-600 dark:text-blue-400"
+                                  : "",
+                              )}
+                            >
+                              {user.name}
+                            </p>
+                            {isSelf && (
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                Вы
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {user.login}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-secondary/30 rounded-lg px-3 py-2">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Организация
+                        </p>
+                        <p className="text-sm font-medium break-words">
+                          {user.organization || "—"}
+                        </p>
+                      </div>
+                      <div className="bg-secondary/30 rounded-lg px-3 py-2">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Контакты представителя
+                        </p>
+                        <p className="text-sm font-medium whitespace-pre-wrap break-words">
+                          {user.representativeContacts || "—"}
+                        </p>
+                      </div>
+
                       {!isSelf && (
-                        <div className="mt-2 pt-2 border-t border-border grid grid-cols-2 gap-2">
+                        <div className="pt-2 border-t border-border grid grid-cols-2 gap-2">
                           <Button
                             size="sm"
                             variant={user.banned ? "default" : "destructive"}
-                            type="button"
-                            onClick={(event) =>
-                              handleBanClick(event, user.id, user.banned)
-                            }
-                            disabled={actionLoading !== null || !currentUser}
+                            onClick={() => handleBan(user.id, user.banned)}
+                            disabled={actionLoading !== null}
                             className="w-full"
-                            onMouseDownCapture={stopRowNavigation}
                           >
                             {actionLoading === user.id ? (
                               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             ) : (
                               <>
                                 <Ban className="w-3 h-3 mr-1" />
-                                {user.banned ? "Разбанить" : "Заблокировать"}
+                                {user.banned ? "Разбанить" : "Забанить"}
                               </>
                             )}
                           </Button>
@@ -430,13 +415,9 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              type="button"
-                              onClick={(event) =>
-                                handleRoleButtonClick(event, user.id, "admin")
-                              }
-                              disabled={actionLoading !== null || !currentUser}
+                              onClick={() => handleRoleChange(user.id, "admin")}
+                              disabled={actionLoading !== null}
                               className="w-full"
-                              onMouseDownCapture={stopRowNavigation}
                             >
                               <Shield className="w-3 h-3 mr-1" />
                               Админ
@@ -445,17 +426,9 @@ export default function UsersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              type="button"
-                              onClick={(event) =>
-                                handleRoleButtonClick(
-                                  event,
-                                  user.id,
-                                  "organization",
-                                )
-                              }
-                              disabled={actionLoading !== null || !currentUser}
+                              onClick={() => handleRoleChange(user.id, "user")}
+                              disabled={actionLoading !== null}
                               className="w-full"
-                              onMouseDownCapture={stopRowNavigation}
                             >
                               <UserIcon className="w-3 h-3 mr-1" />
                               Снять админа
@@ -473,19 +446,16 @@ export default function UsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead
-                      aria-sort={
-                        sortOrder === "nameAsc" ? "ascending" : "descending"
-                      }
-                    >
+                    <TableHead>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSortOrder((value) =>
-                            value === "nameAsc" ? "nameDesc" : "nameAsc",
-                          )
-                        }
+                        onClick={toggleNameSort}
                         className="inline-flex items-center gap-1.5 font-semibold text-foreground transition-colors hover:text-primary"
+                        aria-label={
+                          sortOrder === "nameAsc"
+                            ? "Сортировать имена в обратном порядке"
+                            : "Сортировать имена в алфавитном порядке"
+                        }
                       >
                         Имя
                         {sortOrder === "nameAsc" ? (
@@ -496,32 +466,34 @@ export default function UsersPage() {
                       </button>
                     </TableHead>
                     <TableHead>Логин</TableHead>
+                    <TableHead>Организация</TableHead>
+                    <TableHead>Контакты представителя</TableHead>
                     <TableHead className="w-[100px]">Статус</TableHead>
-                    <TableHead className="w-[380px]">Действия</TableHead>
+                    <TableHead className="w-[360px]">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => {
+                  {visibleUsers.map((user) => {
                     const isSelf = isCurrentUser(user.id);
                     const isAdmin = user.role === "Admin";
 
                     return (
                       <TableRow
                         key={user.id}
-                        className="hover:bg-muted/50 cursor-pointer"
-                        onClick={() => openUser(user.id)}
-                        tabIndex={0}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={(event) => handleRowNavigation(event, user.id)}
                         onKeyDown={(event) => {
                           if (
                             event.target === event.currentTarget &&
                             (event.key === "Enter" || event.key === " ")
                           ) {
                             event.preventDefault();
-                            openUser(user.id);
+                            router.push(`/dashboard/users/${user.id}`);
                           }
                         }}
+                        tabIndex={0}
                       >
-                        <TableCell>
+                        <TableCell className="max-w-[240px] whitespace-normal break-words">
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
@@ -540,55 +512,53 @@ export default function UsersPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          @{user.login}
+                        <TableCell className="max-w-[160px] whitespace-normal break-words text-muted-foreground">
+                          {user.login}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] whitespace-normal break-words">
+                          {user.organization || "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[240px] whitespace-pre-wrap break-words">
+                          {user.representativeContacts || "—"}
                         </TableCell>
                         <TableCell>
                           {user.banned ? (
                             <div className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
                               <Ban className="w-3 h-3 text-red-600 dark:text-red-400" />
                               <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                Заблокирован
+                                Забанен
                               </span>
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1 bg-green-500/10 border border-green-500/20 rounded px-2 py-1">
                               <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                                Без блокировки
+                                Без бана
                               </span>
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="whitespace-normal">
+                        <TableCell>
                           {isSelf ? (
-                            <div className="max-w-[320px] text-sm text-muted-foreground italic text-right leading-5">
+                            <div className="text-sm text-muted-foreground italic text-right">
                               Вы не можете изменять свой аккаунт
                             </div>
                           ) : (
-                            <div className="grid min-w-[340px] grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                               <Button
                                 size="sm"
                                 variant={
                                   user.banned ? "default" : "destructive"
                                 }
-                                type="button"
-                                onClick={(event) =>
-                                  handleBanClick(event, user.id, user.banned)
-                                }
-                                disabled={
-                                  actionLoading !== null || !currentUser
-                                }
-                                className="w-full whitespace-nowrap"
-                                onMouseDownCapture={stopRowNavigation}
+                                onClick={() => handleBan(user.id, user.banned)}
+                                disabled={actionLoading !== null}
+                                className="w-full"
                               >
                                 {actionLoading === user.id ? (
                                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                 ) : (
                                   <>
                                     <Ban className="w-3 h-3 mr-1" />
-                                    {user.banned
-                                      ? "Разбанить"
-                                      : "Заблокировать"}
+                                    {user.banned ? "Разбанить" : "Забанить"}
                                   </>
                                 )}
                               </Button>
@@ -597,19 +567,11 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  type="button"
-                                  onClick={(event) =>
-                                    handleRoleButtonClick(
-                                      event,
-                                      user.id,
-                                      "admin",
-                                    )
+                                  onClick={() =>
+                                    handleRoleChange(user.id, "admin")
                                   }
-                                  disabled={
-                                    actionLoading !== null || !currentUser
-                                  }
-                                  className="w-full whitespace-nowrap"
-                                  onMouseDownCapture={stopRowNavigation}
+                                  disabled={actionLoading !== null}
+                                  className="w-full"
                                 >
                                   <Shield className="w-3 h-3 mr-1" />
                                   Сделать админом
@@ -618,22 +580,14 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  type="button"
-                                  onClick={(event) =>
-                                    handleRoleButtonClick(
-                                      event,
-                                      user.id,
-                                      "organization",
-                                    )
+                                  onClick={() =>
+                                    handleRoleChange(user.id, "user")
                                   }
-                                  disabled={
-                                    actionLoading !== null || !currentUser
-                                  }
-                                  className="w-full whitespace-nowrap"
-                                  onMouseDownCapture={stopRowNavigation}
+                                  disabled={actionLoading !== null}
+                                  className="w-full"
                                 >
                                   <UserIcon className="w-3 h-3 mr-1" />
-                                  Обычный доступ
+                                  Снять админа
                                 </Button>
                               )}
                             </div>

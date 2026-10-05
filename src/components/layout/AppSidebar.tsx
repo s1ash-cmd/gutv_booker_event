@@ -26,9 +26,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAvatarUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
-const adminMenuItems = [
+export const adminMenuItems = [
   { title: "Все заявки", icon: Calendar, href: "/dashboard/events" },
   { title: "Пользователи", icon: Users, href: "/dashboard/users" },
+];
+
+export const mainMenuItems = [
+  { title: "Мои заявки", icon: Calendar, href: "/dashboard/events/my" },
 ];
 
 export function AppSidebar() {
@@ -40,15 +44,6 @@ export function AppSidebar() {
   if (!user) return null;
 
   const isAdmin = user.role === "Admin";
-  const profileHref = "/dashboard/events/my";
-  const mainMenuItems = [
-    {
-      title: "Мои заявки",
-      icon: Calendar,
-      href: profileHref,
-    },
-  ];
-
   const visibleMenuItems = isAdmin
     ? [...mainMenuItems, ...adminMenuItems]
     : mainMenuItems;

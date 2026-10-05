@@ -1,6 +1,7 @@
 "use client";
 import { ChevronLeft } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { UserResponseDto } from "@/app/models/user/user";
 import { AdminOnly } from "@/components/AdminOnly";
@@ -8,13 +9,11 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { EventListPage } from "@/components/EventListPage";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import styles from "@/components/profile/ProfileLayout.module.css";
-import { Button } from "@/components/ui/button";
 import type { EventPage } from "@/lib/eventApi";
 import { userApi } from "@/lib/userApi";
 import { getErrorMessage } from "@/lib/userFacingMessages";
 export default function UserDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const userId = Number(params.id);
   const [summary, setSummary] = useState<EventPage["summary"] | null>(null);
   const [user, setUser] = useState<UserResponseDto | null>(null);
@@ -49,16 +48,13 @@ export default function UserDetailPage() {
       <main
         className={`${styles.page} pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8`}
       >
-        <div className="flex items-center gap-3 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            aria-label="Назад"
-          >
-            <ChevronLeft size={18} />
-          </Button>
-          <h1 className="text-2xl font-semibold">Профиль пользователя</h1>
+        <div className={styles.pageTop}>
+          <Link href="/dashboard/users" className={styles.simpleLink}>
+            <ChevronLeft size={15} /> Пользователи
+          </Link>
+          <span className={styles.eyebrow}>
+            Профиль пользователя · #{userId}
+          </span>
         </div>
         {error && <ErrorMessage message={error} />}
         {loading ? (
@@ -66,8 +62,8 @@ export default function UserDetailPage() {
         ) : (
           user && (
             <div className={styles.grid}>
+              <ProfileCard user={user} showStatus />
               <div className={styles.panels}>
-                <ProfileCard user={user} showStatus />
                 <section className={styles.panel}>
                   <h2 className="font-semibold mb-4">Данные представителя</h2>
                   <dl className="space-y-4 text-sm">
@@ -106,14 +102,14 @@ export default function UserDetailPage() {
                     </dl>
                   </section>
                 )}
+                <EventListPage
+                  key={userId}
+                  scope="user"
+                  userId={userId}
+                  title="Заявки пользователя"
+                  onSummary={setSummary}
+                />
               </div>
-              <EventListPage
-                key={userId}
-                scope="user"
-                userId={userId}
-                title="Заявки пользователя"
-                onSummary={setSummary}
-              />
             </div>
           )
         )}
