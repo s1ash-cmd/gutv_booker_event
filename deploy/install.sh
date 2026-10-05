@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Provision once as /usr/local/sbin/gutv-event-deploy (root-owned). Never execute checkout shell as root.
 set -euo pipefail
+umask 0077
 [[ ${EUID} -eq 0 ]] || { echo 'Run with sudo.' >&2; exit 1; }
 event_source=${1:?Supply the runner checkout path}
 event_expected=/opt/gutv/actions-runners/event/_work/gutv_booker_event/gutv_booker_event
