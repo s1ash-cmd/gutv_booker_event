@@ -87,10 +87,7 @@ export function RegisterForm() {
     try {
       const firstName = formData.get("firstName") as string;
       const lastName = formData.get("lastName") as string;
-      const patronymic = String(formData.get("patronymic") ?? "").trim();
-      const name = [lastName.trim(), firstName.trim(), patronymic]
-        .filter(Boolean)
-        .join(" ");
+      const name = [lastName.trim(), firstName.trim()].join(" ");
       const login = formData.get("login") as string;
       const password = formData.get("password") as string;
 
@@ -217,16 +214,6 @@ export function RegisterForm() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="patronymic">Отчество (при наличии)</Label>
-              <Input
-                id="patronymic"
-                name="patronymic"
-                maxLength={60}
-                disabled={isLoading}
-                autoComplete="additional-name"
-              />
-            </div>
             <p className="text-sm text-muted-foreground">
               Данные представителя указываются один раз и автоматически
               используются в заявках. Изменить их можно в профиле.
@@ -242,7 +229,7 @@ export function RegisterForm() {
                 [
                   "representativeContacts",
                   "Контакты представителя",
-                  "Телефон или электронная почта",
+                  "Телефон или Telegram",
                   1000,
                 ],
               ] as const
